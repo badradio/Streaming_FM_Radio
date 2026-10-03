@@ -1,0 +1,21 @@
+{
+  "id": "day-set",
+  "name": "Weekday day set",
+  "daypart": "day",
+  "trackIds": [
+    "ac-jis-journey",
+    "can-tm-paperhouse",
+    "fela-zombie",
+    "bc-nm-long",
+    "slits-typical",
+    "ac-ptah-ptah",
+    "esg-moody",
+    "stereo-brakhage",
+    "can-eb-spoon",
+    "nmh-king",
+    "silver-oscillation",
+    "vu-sunday",
+    "fela-expensive",
+    "th-psycho"
+  ]
+}

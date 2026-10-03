@@ -1,0 +1,50 @@
+---
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { getSignupDb, signupTableReady, unsubscribeByToken } from '../../lib/outpost-db';
+
+export const prerender = false;
+
+const token = Astro.url.searchParams.get('token')?.trim() ?? '';
+let heading = 'Unsubscribe';
+let copy = 'That link is missing a token.';
+
+if (token) {
+  const db = await getSignupDb();
+  if (!db || !(await signupTableReady(db))) {
+    heading = 'Outpost is offline';
+    copy = 'Play still works. Try this link again later.';
+  } else {
+    try {
+      const result = await unsubscribeByToken(db, token, new Date().toISOString());
+      if (!result.ok) {
+        heading = 'Link not recognized';
+        copy = 'This unsubscribe link is not in the list. You may already be off it.';
+      } else if (result.already) {
+        heading = 'Already unsubscribed';
+        copy = 'You are off Outpost transmissions. No further mail from this list.';
+      } else {
+        heading = 'Unsubscribed';
+        copy = 'You are off Outpost transmissions. We will not use this address for the list.';
+      }
+    } catch {
+      heading = 'Outpost is offline';
+      copy = 'Play still works. Try this link again later.';
+    }
+  }
+}
+---
+
+<Base title={`${heading} — Bad Radio`} description="Leave the Outpost transmissions list.">
+  <SiteHeader current="listen" />
+  <main id="main" class="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+    <p class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Outpost</p>
+    <h1 class="mt-3 font-display text-4xl font-extrabold tracking-tight">{heading}</h1>
+    <p class="mt-6 font-serif text-lg text-ink/85">{copy}</p>
+    <p class="mt-8">
+      <a class="font-mono text-sm text-amber hover:text-ink" href="/">Back to listen</a>
+    </p>
+  </main>
+  <SiteFooter />
+</Base>

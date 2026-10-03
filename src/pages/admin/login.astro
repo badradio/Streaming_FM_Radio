@@ -1,0 +1,60 @@
+---
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { getAdminPassword, isValidSession, readSessionCookie } from '../../lib/admin-auth';
+
+export const prerender = false;
+
+const secret = await getAdminPassword();
+const token = readSessionCookie(Astro.request.headers.get('cookie'));
+if (secret && (await isValidSession(token, secret))) {
+  return Astro.redirect('/admin');
+}
+
+const configured = secret.length > 0;
+const error = Astro.url.searchParams.get('error') === '1';
+---
+
+<Base title="Desk login — Bad Radio" description="Operator desk. Password from ADMIN_PASSWORD. No user accounts.">
+  <SiteHeader current="listen" />
+  <main id="main" class="mx-auto max-w-md px-4 py-12 sm:px-6 sm:py-16">
+    <p class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Operator</p>
+    <h1 class="mt-3 font-display text-4xl font-extrabold tracking-tight">Desk login</h1>
+    <p class="mt-4 font-serif text-lg text-ink/85">
+      One shared password from <code class="font-mono text-amber">ADMIN_PASSWORD</code>. There are no user accounts.
+    </p>
+
+    {
+      configured ? (
+        <form method="post" action="/api/admin/login" class="mt-8 space-y-4">
+          <div>
+            <label class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted" for="password">
+              Desk password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autocomplete="current-password"
+              class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink focus:border-amber focus:outline-none"
+            />
+          </div>
+          {error ? <p class="font-mono text-sm text-filament">Wrong desk password.</p> : null}
+          <button
+            type="submit"
+            class="border border-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+          >
+            Open desk
+          </button>
+        </form>
+      ) : (
+        <p class="mt-8 border border-line bg-panel px-4 py-3 font-mono text-sm text-filament">
+          ADMIN_PASSWORD is not set. Put it in .env for local, or a Worker secret for production. There is no default.
+        </p>
+      )
+    }
+  </main>
+  <SiteFooter />
+</Base>

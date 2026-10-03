@@ -1,0 +1,63 @@
+---
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Player from '../components/Player.astro';
+import ListenAnywhere from '../components/ListenAnywhere.astro';
+import Chat from '../components/Chat.astro';
+import RequestDesk from '../components/RequestDesk.astro';
+import OnAir from '../components/OnAir.astro';
+import OutpostSignup from '../components/OutpostSignup.astro';
+import Panther from '../components/Panther.astro';
+import { getPublicStreamUrl } from '../lib/runtime';
+import { outpostFlashMessage } from '../lib/outpost';
+import { reconcileDeskWithAir } from '../lib/radio/reconcile';
+
+export const prerender = false;
+
+const streamUrl = await getPublicStreamUrl();
+const connected = streamUrl.length > 0;
+const { feed } = await reconcileDeskWithAir();
+const outpostFlash = outpostFlashMessage(Astro.url.searchParams.get('outpost'));
+---
+
+<Base
+  title="Bad Radio — Listen live"
+  description="Hit play on Bad Radio. Licensed radio coming via Live365. Requests are delayed — they play later, not next."
+>
+  <SiteHeader current="listen" />
+  <main id="main">
+    <div class="tuner mx-auto max-w-6xl px-4 sm:px-6" aria-hidden="true"></div>
+
+    <section class="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
+      <p class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Listen</p>
+      <p class="mt-3 max-w-3xl font-serif text-lg text-ink/85 sm:text-xl">
+        Licensed radio coming via Live365. Now playing is their on-air metadata. This site keeps the day’s set and the
+        request queue — requests sit at least one hour; they play later, not next.
+        {
+          connected ? (
+            ''
+          ) : (
+            <span class="text-muted"> The play button is dark until PUBLIC_STREAM_URL points at the Live365 mount.</span>
+          )
+        }
+      </p>
+    </section>
+
+    <section class="mx-auto grid max-w-6xl gap-10 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+      <div class="space-y-8">
+        <OnAir initial={feed}>
+          <Player streamUrl={streamUrl} />
+        </OnAir>
+        <ListenAnywhere />
+        <OutpostSignup flash={outpostFlash}>
+          <Panther slot="loaf" pose="loaf" />
+        </OutpostSignup>
+        <RequestDesk />
+      </div>
+
+      <Chat />
+    </section>
+  </main>
+  <SiteFooter />
+</Base>

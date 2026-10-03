@@ -1,0 +1,248 @@
+---
+import Base from '../layouts/Base.astro';
+import Player from '../components/Player.astro';
+import { getPublicStreamUrl } from '../lib/runtime';
+import { reconcileDeskWithAir } from '../lib/radio/reconcile';
+import { relativeTime } from '../lib/relative-time';
+import type { OnAirTrack } from '../lib/live365/normalize';
+
+export const prerender = false;
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=15');
+
+const streamUrl = await getPublicStreamUrl();
+const { feed } = await reconcileDeskWithAir();
+const now = feed.ok ? feed.now : null;
+const recent = feed.ok ? feed.recent : [];
+const seed = JSON.stringify(feed).replace(/</g, '\\u003c');
+
+function artUrl(track: OnAirTrack | null): string | undefined {
+  return track?.art;
+}
+---
+
+<Base
+  chrome="widget"
+  title="badradio"
+  description="badradio live player widget — play the stream and recently played tracks."
+>
+  <div
+    data-widget
+    class="widget-shell mx-auto w-full max-w-none bg-void px-3 py-3 sm:px-4"
+  >
+    <script type="application/json" data-widget-seed set:html={seed}></script>
+
+    <header class="flex items-baseline justify-between gap-3 border-b border-line pb-2">
+      <a
+        data-widget-home
+        href="https://badradio.rocks/"
+        class="font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl"
+      >
+        badradio
+      </a>
+      <p class="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-dim">Underground FM</p>
+    </header>
+
+    <div class="widget-body mt-3 grid gap-4 min-[640px]:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] min-[640px]:items-start">
+      <section class="flex min-w-0 items-center gap-3">
+        <Player streamUrl={streamUrl} size="compact" />
+        <div class="flex min-w-0 flex-1 items-center gap-3">
+          <div
+            data-widget-art-wrap
+            class="relative size-16 shrink-0 overflow-hidden border border-line bg-panel sm:size-[4.5rem]"
+          >
+            {
+              artUrl(now) ? (
+                <img
+                  data-widget-art
+                  src={artUrl(now)}
+                  alt=""
+                  class="size-full object-cover"
+                  width="72"
+                  height="72"
+                />
+              ) : (
+                <img
+                  data-widget-art
+                  src="/icons/icon-192.png"
+                  alt=""
+                  class="size-full object-cover"
+                  width="72"
+                  height="72"
+                />
+              )
+            }
+          </div>
+          <div class="min-w-0">
+            <p class="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-amber">Now playing</p>
+            <p data-widget-artist class="mt-0.5 truncate font-display text-lg font-extrabold leading-tight text-ink sm:text-xl">
+              {now?.artist ?? 'Nothing listed'}
+            </p>
+            <p data-widget-title class="truncate font-serif text-sm text-ink/85 sm:text-base">
+              {now?.title ?? 'Live365 metadata when the mount is up.'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="widget-recent-heading" class="min-w-0 border border-line bg-panel px-3 py-2">
+        <h2 id="widget-recent-heading" class="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-muted">
+          Recently played
+        </h2>
+        <div data-widget-recent>
+          {
+            recent.length === 0 ? (
+              <p class="mt-2 font-serif text-sm text-ink/80">No recent tracks yet.</p>
+            ) : (
+              <ol class="mt-2 space-y-1.5">
+                {recent.map((item) => (
+                  <li class="flex items-baseline justify-between gap-2 font-mono text-[0.75rem] leading-snug text-ink/90">
+                    <span class="min-w-0 truncate">
+                      <span class="text-dim">{item.artist}</span>
+                      <span class="text-dim"> — </span>
+                      {item.title}
+                    </span>
+                    <time class="shrink-0 text-[0.65rem] uppercase tracking-[0.08em] text-dim" datetime={item.startedAt}>
+                      {relativeTime(item.startedAt)}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            )
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { relativeTime } from '../lib/relative-time';
+
+  type Track = { artist: string; title: string; art?: string; startedAt?: string };
+  type Feed =
+    | { ok: true; isPlaying?: boolean; now: Track | null; recent: Track[] }
+    | { ok: false; now: null; recent: [] };
+
+  const POLL_MS = 12_000;
+  const FALLBACK_ART = '/icons/icon-192.png';
+
+  function publishNow(now: Track | null) {
+    window.dispatchEvent(
+      new CustomEvent('badradio:now', {
+        detail: now
+          ? { artist: now.artist, title: now.title, art: now.art }
+          : { artist: 'badradio', title: 'Live' },
+      }),
+    );
+  }
+
+  function init(root: HTMLElement) {
+    const seedNode = root.querySelector<HTMLScriptElement>('[data-widget-seed]');
+    const artistEl = root.querySelector<HTMLElement>('[data-widget-artist]');
+    const titleEl = root.querySelector<HTMLElement>('[data-widget-title]');
+    const artEl = root.querySelector<HTMLImageElement>('[data-widget-art]');
+    const recentEl = root.querySelector<HTMLElement>('[data-widget-recent]');
+    const home = root.querySelector<HTMLAnchorElement>('[data-widget-home]');
+    if (!seedNode || !artistEl || !titleEl || !artEl || !recentEl) return;
+
+    if (home) {
+      if (window.self === window.top) {
+        home.href = '/';
+      } else {
+        home.target = '_blank';
+        home.rel = 'noopener noreferrer';
+      }
+    }
+
+    let lastGood: Feed | null = null;
+    try {
+      lastGood = JSON.parse(seedNode.textContent || 'null') as Feed;
+    } catch {
+      lastGood = null;
+    }
+
+    const render = (feed: Feed) => {
+      const now = feed.ok ? feed.now : null;
+      const recent = feed.ok ? feed.recent : [];
+      publishNow(now);
+      artistEl.textContent = now?.artist ?? 'Nothing listed';
+      titleEl.textContent = now?.title ?? 'Live365 metadata when the mount is up.';
+      artEl.src = now?.art || FALLBACK_ART;
+
+      if (recent.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'mt-2 font-serif text-sm text-ink/80';
+        p.textContent = 'No recent tracks yet.';
+        recentEl.replaceChildren(p);
+        return;
+      }
+
+      const ol = document.createElement('ol');
+      ol.className = 'mt-2 space-y-1.5';
+      for (const item of recent) {
+        const li = document.createElement('li');
+        li.className =
+          'flex items-baseline justify-between gap-2 font-mono text-[0.75rem] leading-snug text-ink/90';
+        const label = document.createElement('span');
+        label.className = 'min-w-0 truncate';
+        const artist = document.createElement('span');
+        artist.className = 'text-dim';
+        artist.textContent = item.artist;
+        const sep = document.createElement('span');
+        sep.className = 'text-dim';
+        sep.textContent = ' — ';
+        label.append(artist, sep, document.createTextNode(item.title));
+        const time = document.createElement('time');
+        time.className = 'shrink-0 text-[0.65rem] uppercase tracking-[0.08em] text-dim';
+        if (item.startedAt) time.dateTime = item.startedAt;
+        time.textContent = relativeTime(item.startedAt);
+        li.append(label, time);
+        ol.appendChild(li);
+      }
+      recentEl.replaceChildren(ol);
+    };
+
+    const pull = async () => {
+      try {
+        const response = await fetch('/api/now-playing', { headers: { Accept: 'application/json' } });
+        const data = (await response.json()) as Feed;
+        if (data && data.ok && (data.now || data.recent.length > 0)) {
+          lastGood = data;
+          render(data);
+          return;
+        }
+        if (lastGood?.ok) {
+          render(lastGood);
+          return;
+        }
+        render(data);
+      } catch {
+        if (lastGood?.ok) render(lastGood);
+      }
+    };
+
+    let timer: number | undefined;
+    const schedule = () => {
+      window.clearTimeout(timer);
+      if (document.visibilityState === 'hidden') return;
+      timer = window.setTimeout(async () => {
+        await pull();
+        schedule();
+      }, POLL_MS);
+    };
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        void pull().then(schedule);
+      } else {
+        window.clearTimeout(timer);
+      }
+    });
+
+    if (lastGood) render(lastGood);
+    schedule();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget]').forEach(init);
+</script>

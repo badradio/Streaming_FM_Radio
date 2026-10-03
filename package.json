@@ -1,0 +1,41 @@
+{
+  "name": "bad-radio",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Bad Radio — underground FM. Live365-licensed stream, delayed request queue.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1 --port 43123",
+    "build": "astro build",
+    "preview": "astro preview --host 127.0.0.1 --port 43123",
+    "check": "astro check",
+    "test": "vitest run",
+    "deploy": "astro build && wrangler deploy --keep-vars",
+    "d1:create": "wrangler d1 create badradio-master",
+    "d1:migrate": "wrangler d1 migrations apply badradio-master --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply badradio-master --remote",
+    "cf:preview": "astro build && wrangler dev",
+    "astro": "astro",
+    "generate-types": "wrangler types"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.2.6",
+    "@astrojs/markdown-satteri": "^0.4.0",
+    "@astrojs/mdx": "^8.0.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.2.10",
+    "tailwindcss": "^4.3.3",
+    "wrangler": "^4.128.0"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

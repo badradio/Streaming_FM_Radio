@@ -1,0 +1,69 @@
+---
+import '../styles/global.css';
+import Analytics from '../components/Analytics.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  chrome?: 'full' | 'widget';
+}
+
+const { title, description, chrome = 'full' } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const isWidget = chrome === 'widget';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#080705" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="badradio" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Syne:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <title>{title}</title>
+    <Analytics />
+  </head>
+  <body class:list={['relative bg-void text-ink antialiased', isWidget ? 'min-h-0' : 'min-h-dvh']}>
+    {
+      isWidget ? null : (
+        <a
+          href="#main"
+          class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-amber focus:px-3 focus:py-2 focus:font-mono focus:text-sm focus:text-void"
+        >
+          Skip to content
+        </a>
+      )
+    }
+    <div class="grain" aria-hidden="true"></div>
+    <div class="relative z-10">
+      <slot />
+    </div>
+    {
+      isWidget ? null : (
+        <script>
+          if (window.self === window.top && 'serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+              navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
+                /* offline install is optional */
+              });
+            });
+          }
+        </script>
+      )
+    }
+  </body>
+</html>

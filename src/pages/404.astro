@@ -1,0 +1,24 @@
+---
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Panther from '../components/Panther.astro';
+---
+
+<Base title="Not found — Bad Radio" description="That page is not on this station.">
+  <SiteHeader current="listen" />
+  <main id="main" class="relative mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+    <div class="pointer-events-none absolute right-4 top-8 sm:right-0" aria-hidden="true">
+      <Panther pose="loaf" />
+    </div>
+    <p class="font-mono text-xs uppercase tracking-[0.22em] text-muted">404</p>
+    <h1 class="mt-3 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Nothing on this frequency</h1>
+    <p class="mt-6 max-w-lg font-serif text-lg text-ink/85">
+      That path is not a listen page, a desk, or a stream short URL. Hit play from home.
+    </p>
+    <p class="mt-8">
+      <a class="font-mono text-sm text-amber hover:text-ink" href="/">Back to listen</a>
+    </p>
+  </main>
+  <SiteFooter />
+</Base>

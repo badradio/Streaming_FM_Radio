@@ -1,0 +1,18 @@
+---
+import loungeRaw from '../assets/panther/panther-lounge.svg?raw';
+import peekRaw from '../assets/panther/panther-peek.svg?raw';
+import loafRaw from '../assets/panther/panther-loaf.svg?raw';
+import { pantherSvgMarkup } from '../lib/panther';
+
+interface Props {
+  pose: 'lounge' | 'peek' | 'loaf';
+  class?: string;
+}
+
+const { pose, class: className = '' } = Astro.props;
+const raw = pose === 'lounge' ? loungeRaw : pose === 'peek' ? peekRaw : loafRaw;
+const extra = [`panther-${pose}`, className].filter(Boolean).join(' ');
+const markup = pantherSvgMarkup(raw, extra);
+---
+
+<Fragment set:html={markup} />

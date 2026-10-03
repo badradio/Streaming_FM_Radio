@@ -1,0 +1,41 @@
+---
+import type { NowPlayingProps } from './component-props';
+
+type Props = NowPlayingProps;
+
+const { badge, artist, title, album, year, empty } = Astro.props;
+---
+
+<section aria-labelledby="now-playing-heading" class="min-w-0 flex-1">
+  <p
+    class="mb-3 inline-block border border-amber/50 bg-amber/10 px-2 py-0.5 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-amber"
+  >
+    {badge}
+  </p>
+  <p id="now-playing-heading" class="font-mono text-xs uppercase tracking-[0.22em] text-muted">
+    Now playing
+  </p>
+  {
+    empty ? (
+      <>
+        <p class="mt-2 font-display text-4xl font-extrabold leading-[0.95] tracking-tight text-ink sm:text-5xl">
+          Nothing on the log yet
+        </p>
+        <p class="mt-3 font-serif text-xl text-ink/90">
+          The day’s set is on the desk. Requests sit in queue — they play later, not next.
+        </p>
+      </>
+    ) : (
+      <>
+        <p class="mt-2 font-display text-4xl font-extrabold leading-[0.95] tracking-tight text-ink sm:text-5xl lg:text-6xl">
+          {artist}
+        </p>
+        {title ? <p class="mt-3 font-serif text-xl text-ink/90 sm:text-2xl">{title}</p> : null}
+        <p class="mt-2 font-mono text-sm uppercase tracking-[0.18em] text-muted">
+          {album}
+          {year ? ` · ${year}` : ''}
+        </p>
+      </>
+    )
+  }
+</section>

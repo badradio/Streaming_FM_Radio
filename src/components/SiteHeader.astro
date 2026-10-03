@@ -1,0 +1,53 @@
+---
+interface Props {
+  current: 'listen' | 'about' | 'schedule';
+}
+
+const { current } = Astro.props;
+
+const links = [
+  { href: '/', id: 'listen' as const, label: 'Listen' },
+  { href: '/about', id: 'about' as const, label: 'About' },
+  { href: '/schedule', id: 'schedule' as const, label: 'Schedule' },
+];
+---
+
+<header class="border-b border-line">
+  <div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+    <div class="flex items-baseline justify-between gap-4">
+      <a href="/" class="font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+        badradio
+      </a>
+      <p class="font-mono text-[0.65rem] uppercase tracking-[0.22em] text-dim sm:text-xs">
+        Underground FM · listen live
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <nav aria-label="Station" class="flex gap-1 font-mono text-xs uppercase tracking-[0.18em]">
+        {
+          links.map((link) => (
+            <a
+              href={link.href}
+              aria-current={current === link.id ? 'page' : undefined}
+              class:list={[
+                'px-2 py-1 transition-colors',
+                current === link.id ? 'text-amber' : 'text-muted hover:text-ink',
+              ]}
+            >
+              {link.label}
+            </a>
+          ))
+        }
+      </nav>
+
+      <p
+        class="inline-flex items-center gap-2 border border-line px-2.5 py-1 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted"
+        title="Programming desk is on this site. Licensed stream comes from Live365 once the mount is set."
+      >
+        <span class="size-1.5 rounded-full bg-dim" aria-hidden="true"></span>
+        Desk online
+      </p>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,171 @@
+---
+---
+
+<section
+  class="border border-line bg-panel"
+  aria-labelledby="request-heading"
+  data-request-desk
+>
+  <header class="border-b border-line px-4 py-3">
+    <h2 id="request-heading" class="font-display text-lg font-bold tracking-tight">
+      Request desk
+    </h2>
+    <p class="mt-1 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">
+      Requests play later, not next
+    </p>
+  </header>
+
+  <div class="space-y-3 px-4 py-4">
+    <p class="font-serif text-[1.05rem] leading-snug text-ink/85">
+      Search the request catalog (starter titles plus anything promoted from the air log) or paste artist / title. The
+      statute clock starts when you submit: at least one hour, and the Sound Recording Performance Complement can refuse
+      a track (album cap, artist cap).
+    </p>
+
+    <form data-request-form class="space-y-3">
+      <div>
+        <label class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted" for="request-query">
+          Artist / title
+        </label>
+        <input
+          id="request-query"
+          data-request-query
+          name="query"
+          type="search"
+          autocomplete="off"
+          placeholder="e.g. Can — Spoon"
+          class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink placeholder:text-dim focus:border-amber focus:outline-none"
+        />
+      </div>
+
+      <ul data-request-results class="hidden divide-y divide-line border border-line"></ul>
+      <input type="hidden" name="trackId" data-request-track-id />
+
+      <div>
+        <label class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted" for="request-label">
+          Your label (optional)
+        </label>
+        <input
+          id="request-label"
+          data-request-label
+          name="requesterLabel"
+          type="text"
+          maxlength="40"
+          placeholder="listener"
+          class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink placeholder:text-dim focus:border-amber focus:outline-none"
+        />
+      </div>
+
+      <button
+        type="submit"
+        data-request-submit
+        class="border border-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber"
+      >
+        Queue request
+      </button>
+    </form>
+
+    <p data-request-status class="font-mono text-[0.75rem] text-muted" role="status" aria-live="polite"></p>
+  </div>
+</section>
+
+<script>
+  type Hit = { id: string; title: string; artist: string; album: string; year: number };
+
+  function initDesk(root: HTMLElement) {
+    const form = root.querySelector<HTMLFormElement>('[data-request-form]');
+    const query = root.querySelector<HTMLInputElement>('[data-request-query]');
+    const results = root.querySelector<HTMLUListElement>('[data-request-results]');
+    const trackId = root.querySelector<HTMLInputElement>('[data-request-track-id]');
+    const label = root.querySelector<HTMLInputElement>('[data-request-label]');
+    const status = root.querySelector<HTMLElement>('[data-request-status]');
+    const submit = root.querySelector<HTMLButtonElement>('[data-request-submit]');
+    if (!form || !query || !results || !trackId || !label || !status || !submit) return;
+
+    let timer: number | undefined;
+
+    const setStatus = (text: string, kind: 'ok' | 'err' | 'info') => {
+      status.textContent = text;
+      status.classList.toggle('text-signal', kind === 'ok');
+      status.classList.toggle('text-filament', kind === 'err');
+      status.classList.toggle('text-muted', kind === 'info');
+    };
+
+    const renderHits = (hits: Hit[]) => {
+      results.innerHTML = '';
+      if (hits.length === 0) {
+        results.classList.add('hidden');
+        return;
+      }
+      results.classList.remove('hidden');
+      for (const hit of hits) {
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className =
+          'w-full px-3 py-2 text-left font-mono text-sm text-ink/90 hover:bg-amber/10 focus-visible:outline-2 focus-visible:outline-amber';
+        button.textContent = `${hit.artist} — ${hit.title}`;
+        const meta = document.createElement('span');
+        meta.className = 'mt-0.5 block text-[0.65rem] uppercase tracking-[0.12em] text-dim';
+        meta.textContent = `${hit.album} · ${hit.year}`;
+        button.appendChild(meta);
+        button.addEventListener('click', () => {
+          trackId.value = hit.id;
+          query.value = `${hit.artist} — ${hit.title}`;
+          results.classList.add('hidden');
+          setStatus(`Selected ${hit.artist} — ${hit.title}. Still plays later, not next.`, 'info');
+        });
+        li.appendChild(button);
+        results.appendChild(li);
+      }
+    };
+
+    query.addEventListener('input', () => {
+      trackId.value = '';
+      window.clearTimeout(timer);
+      const q = query.value.trim();
+      if (q.length < 2) {
+        results.classList.add('hidden');
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        const response = await fetch(`/api/tracks?q=${encodeURIComponent(q)}`);
+        if (!response.ok) return;
+        const data = (await response.json()) as { tracks: Hit[] };
+        renderHits(data.tracks);
+      }, 180);
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      submit.disabled = true;
+      setStatus('Checking the hour delay and SRPC…', 'info');
+      try {
+        const response = await fetch('/api/requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            trackId: trackId.value || undefined,
+            query: query.value,
+            requesterLabel: label.value,
+          }),
+        });
+        const data = (await response.json()) as { ok: boolean; message?: string; code?: string };
+        if (!data.ok) {
+          setStatus(data.message ?? 'Request refused.', 'err');
+          return;
+        }
+        setStatus(data.message ?? 'Queued.', 'ok');
+        trackId.value = '';
+        query.value = '';
+        results.classList.add('hidden');
+      } catch {
+        setStatus("Can't reach the request desk.", 'err');
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-request-desk]').forEach(initDesk);
+</script>

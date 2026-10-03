@@ -1,0 +1,923 @@
+---
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { getAdminPassword, isValidSession, readSessionCookie } from '../../lib/admin-auth';
+import { catalog, findTrack, stationTracks } from '../../lib/radio/catalog';
+import { airLogInCatalog, listAirLog } from '../../lib/radio/airlog';
+import { inspectQueue, readyRequests } from '../../lib/radio/ready';
+import { extraAirHistory, reconcileDeskWithAir } from '../../lib/radio/reconcile';
+import { pageIds } from '../../lib/radio/master';
+import { loadMasterRows, openMasterLibrary } from '../../lib/radio/master-db';
+import { workerEnv } from '../../lib/runtime';
+import type { OnAirTrack } from '../../lib/live365/normalize';
+import type { MasterTrack } from '../../lib/radio/master';
+
+export const prerender = false;
+
+const secret = await getAdminPassword();
+const token = readSessionCookie(Astro.request.headers.get('cookie'));
+if (!secret || !(await isValidSession(token, secret))) {
+  return Astro.redirect('/admin/login');
+}
+
+const reconciled = await reconcileDeskWithAir();
+const state = reconciled.state;
+const now = new Date();
+const liveNow = reconciled.feed.ok ? reconciled.feed.now : null;
+const air: OnAirTrack[] = reconciled.feed.ok
+  ? [reconciled.feed.now, ...reconciled.feed.recent].filter((item): item is OnAirTrack => !!item)
+  : [];
+const inspections = inspectQueue({
+  state,
+  now,
+  tracks: stationTracks(state),
+  extraHistory: extraAirHistory(state, air, now),
+});
+const ready = readyRequests(inspections);
+const blocked = inspections.filter((item) => !item.ready);
+const last = [...state.plays].sort((a, b) => a.playedAt.localeCompare(b.playedAt)).at(-1);
+const nowTrack = last ? findTrack(last.trackId, state) : undefined;
+const deskHistory = [...state.plays]
+  .sort((a, b) => a.playedAt.localeCompare(b.playedAt))
+  .slice(-8)
+  .reverse()
+  .flatMap((play) => {
+    const track = findTrack(play.trackId, state);
+    return track ? [{ play, track }] : [];
+  });
+const remaining = state.playlist.trackIds.slice(state.nextSetIndex).flatMap((id) => {
+  const track = findTrack(id, state);
+  return track ? [track] : [];
+});
+const queued = state.requests.filter((item) => item.status === 'queued' || item.status === 'scheduled');
+const airQuery = Astro.url.searchParams.get('air')?.trim() ?? '';
+const airTotal = Object.keys(state.airLog).length;
+const airRows = listAirLog(state, { query: airQuery, limit: 150 });
+
+const libBucket = Astro.url.searchParams.get('lib') ?? 'master-only';
+const libPageNum = Number(Astro.url.searchParams.get('lp') ?? '1') || 1;
+const masterLib = await openMasterLibrary((await workerEnv())?.MASTER, Object.keys(state.airLog));
+let masterBound = masterLib.bound;
+let masterNote = masterLib.note;
+let masterCounts = {
+  masterTotal: masterLib.diff.masterTotal,
+  airTotal: masterLib.diff.airTotal,
+  intersection: masterLib.diff.intersection.length,
+  masterOnly: masterLib.diff.masterOnly.length,
+  airOnly: masterLib.diff.airOnly.length,
+};
+let libRows: Array<MasterTrack & { plays?: number }> = [];
+let libAirRows: Array<{ id: string; artist: string; title: string; plays: number }> = [];
+let libPages = 1;
+let libPage = 1;
+if (masterBound && masterLib.db) {
+  try {
+    const ids =
+      libBucket === 'air-only'
+        ? masterLib.diff.airOnly
+        : libBucket === 'intersection'
+          ? masterLib.diff.intersection
+          : masterLib.diff.masterOnly;
+    const paged = pageIds(ids, libPageNum, 40);
+    libPages = paged.pages;
+    libPage = paged.page;
+    if (libBucket === 'air-only') {
+      libAirRows = paged.slice.flatMap((id) => {
+        const entry = state.airLog[id];
+        return entry ? [{ id, artist: entry.artist, title: entry.title, plays: entry.plays }] : [];
+      });
+    } else {
+      libRows = await loadMasterRows(masterLib.db, paged.slice);
+    }
+  } catch {
+    masterBound = false;
+    masterNote =
+      'D1 MASTER query failed while loading the library lists. The rest of the desk still works. Check master_tracks.';
+  }
+}
+---
+
+<Base title="Operator desk — Bad Radio" description="Day set, request queue, AutoDJ pick. Not shown to listeners.">
+  <SiteHeader current="listen" />
+  <main id="main" class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Operator only</p>
+        <h1 class="mt-2 font-display text-4xl font-extrabold tracking-tight">Desk</h1>
+        <p class="mt-3 max-w-2xl font-serif text-lg text-ink/85">
+          Live365 AutoDJ is manual; this desk tracks legality and requests. Listeners never see this board. Do not
+          publish an advance timed grid.
+        </p>
+      </div>
+      <form method="post" action="/api/admin/logout">
+        <button
+          type="submit"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-ink"
+        >
+          Lock desk
+        </button>
+      </form>
+    </div>
+
+    <section class="mt-10 grid gap-6 lg:grid-cols-2">
+      <div class="border border-line bg-panel px-4 py-4">
+        <h2 class="font-mono text-xs uppercase tracking-[0.22em] text-muted">On air / desk log</h2>
+        {
+          liveNow ? (
+            <p class="mt-3 font-display text-2xl font-bold">
+              {liveNow.artist}
+              <span class="mt-1 block font-serif text-lg font-normal text-ink/80">{liveNow.title}</span>
+            </p>
+          ) : nowTrack ? (
+            <p class="mt-3 font-display text-2xl font-bold">
+              {nowTrack.artist}
+              <span class="mt-1 block font-serif text-lg font-normal text-ink/80">{nowTrack.title}</span>
+            </p>
+          ) : (
+            <p class="mt-3 font-serif text-ink/80">Nothing from Live365 or the desk log yet.</p>
+          )
+        }
+        <p class="mt-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+          {liveNow ? 'Live365 current-track' : 'Desk log (Live365 metadata unavailable)'}
+        </p>
+        <form class="mt-4" data-pick-form>
+          <button
+            type="submit"
+            class="border border-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+          >
+            AutoDJ pick next
+          </button>
+          <p data-pick-status class="mt-2 font-mono text-xs text-muted" role="status"></p>
+        </form>
+      </div>
+
+      <div class="border border-line bg-panel px-4 py-4">
+        <h2 class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Up next (desk only)</h2>
+        <p class="mt-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+          Order, not a public clock
+        </p>
+        <ol class="mt-3 space-y-1 font-mono text-sm text-ink/90">
+          {
+            remaining.slice(0, 8).map((track) => (
+              <li>
+                <span class="text-dim">{track.artist}</span> — {track.title}
+              </li>
+            ))
+          }
+        </ol>
+        {remaining.length === 0 ? <p class="mt-3 font-serif text-ink/80">Set list is exhausted.</p> : null}
+      </div>
+    </section>
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4" data-playlist-editor>
+      <h2 class="font-display text-xl font-bold">Day set</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        The day starts from this ordered list. Git seed is
+        <code class="font-mono text-amber">src/data/playlists/day-set.json</code>. Saving here writes the runtime desk, not
+        the git file.
+      </p>
+
+      <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <label class="block">
+          <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Name</span>
+          <input
+            data-pl-name
+            value={state.playlist.name}
+            class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink focus:border-amber focus:outline-none"
+          />
+        </label>
+        <label class="block">
+          <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Daypart</span>
+          <input
+            data-pl-daypart
+            value={state.playlist.daypart}
+            class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink focus:border-amber focus:outline-none"
+          />
+        </label>
+      </div>
+
+      <label class="mt-4 block">
+        <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Add from catalog</span>
+        <select
+          data-pl-add
+          class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink focus:border-amber focus:outline-none"
+        >
+          <option value="">Select a track…</option>
+          {
+            catalog.map((track) => (
+              <option value={track.id}>
+                {track.artist} — {track.title} ({track.album}, {track.year})
+              </option>
+            ))
+          }
+        </select>
+      </label>
+
+      <ol data-pl-list class="mt-4 divide-y divide-line border border-line">
+        {
+          state.playlist.trackIds.map((id) => {
+            const track = findTrack(id, state);
+            if (!track) return null;
+            return (
+              <li class="flex items-center gap-2 px-3 py-2 font-mono text-sm" data-pl-id={track.id}>
+                <span class="min-w-0 flex-1">
+                  <span class="text-dim">{track.artist}</span> — {track.title}
+                </span>
+                <button type="button" data-pl-up class="text-muted hover:text-amber">
+                  Up
+                </button>
+                <button type="button" data-pl-down class="text-muted hover:text-amber">
+                  Down
+                </button>
+                <button type="button" data-pl-remove class="text-filament hover:text-ink">
+                  Remove
+                </button>
+              </li>
+            );
+          })
+        }
+      </ol>
+
+      <div class="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          data-pl-save
+          class="border border-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+        >
+          Save day set
+        </button>
+        <p data-pl-status class="self-center font-mono text-xs text-muted" role="status"></p>
+      </div>
+    </section>
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4">
+      <h2 class="font-display text-xl font-bold">Ready to air</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        Delay has elapsed and SRPC still passes against recent air. Copy this order into Live365 AutoDJ yourself —
+        Live365 cannot import M3U. Obvious artist/title matches mark played on their own when the mount metadata
+        lands.
+      </p>
+      {
+        ready.length === 0 ? (
+          <p class="mt-4 font-serif text-ink/80">Nothing is ready. Check not-ready and the delay clock.</p>
+        ) : (
+          <ol class="mt-4 space-y-2 font-mono text-sm">
+            {ready.map((item, i) => (
+              <li class="border border-signal/40 bg-void px-3 py-2">
+                <span class="text-dim">#{i + 1}</span>{' '}
+                <span class="text-dim">{item.track.artist}</span> — {item.track.title}
+                <span class="mt-1 block text-[0.65rem] uppercase tracking-[0.14em] text-muted">
+                  {item.track.album ?? 'album unknown'}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )
+      }
+    </section>
+
+    {
+      blocked.length > 0 && (
+        <section class="mt-10 border border-line bg-panel px-4 py-4">
+          <h2 class="font-display text-xl font-bold">Not ready</h2>
+          <p class="mt-1 font-serif text-ink/80">
+            Stay in the queue until the delay or SRPC cap clears. Do not load these into Live365 yet.
+          </p>
+          <ul class="mt-4 space-y-2 font-mono text-sm">
+            {blocked.map((item) => (
+              <li class="border border-line bg-void px-3 py-2">
+                <p>
+                  <span class="text-dim">{item.track?.artist ?? 'unknown'}</span> —{' '}
+                  {item.track?.title ?? item.request.trackId}
+                </p>
+                <p class="mt-1 text-amber">{item.blocked?.message}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4">
+      <h2 class="font-display text-xl font-bold">Request queue</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        Full queue, including items still on the one-hour clock. Auto-mark from Live365 is the bookkeeping path;
+        Mark played is only for metadata misses. earliest_play_at is desk-only.
+      </p>
+      {
+        queued.length === 0 ? (
+          <p class="mt-4 font-serif text-ink/80">Queue is empty.</p>
+        ) : (
+          <div class="mt-4 overflow-x-auto">
+            <table class="w-full min-w-[40rem] text-left font-mono text-xs">
+              <thead class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+                <tr>
+                  <th class="py-2 pr-3">Track</th>
+                  <th class="py-2 pr-3">From</th>
+                  <th class="py-2 pr-3">Status</th>
+                  <th class="py-2 pr-3">Earliest</th>
+                  <th class="py-2"> </th>
+                </tr>
+              </thead>
+              <tbody>
+                {queued.map((item) => {
+                  const track = findTrack(item.trackId, state);
+                  return (
+                    <tr class="border-t border-line align-top">
+                      <td class="py-2 pr-3 text-ink/90">
+                        {track ? `${track.artist} — ${track.title}` : item.trackId}
+                      </td>
+                      <td class="py-2 pr-3 text-muted">{item.requesterLabel}</td>
+                      <td class="py-2 pr-3 text-amber">{item.status}</td>
+                      <td class="py-2 pr-3 text-dim">{item.earliestPlayAt.replace('T', ' ').replace('Z', ' UTC')}</td>
+                      <td class="py-2">
+                        <button type="button" data-played={item.id} class="mr-3 text-signal hover:text-ink">
+                          Mark played
+                        </button>
+                        <button
+                          type="button"
+                          data-reject={item.id}
+                          class="text-filament hover:text-ink"
+                        >
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </section>
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4">
+      <h2 class="font-display text-xl font-bold">Live365 export</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        Live365 cannot import M3U or JSON. These files are a rebuild checklist: artist, title, album, in air
+        order. No timestamps — they would imply interactive play. Default is ready-to-air only.
+      </p>
+      <div class="mt-4 flex flex-wrap gap-3">
+        <a
+          href="/api/admin/export?format=json&scope=ready"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Ready JSON
+        </a>
+        <a
+          href="/api/admin/export?format=m3u&scope=ready"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Ready M3U
+        </a>
+        <a
+          href="/api/admin/export?format=json&scope=ready+day"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Ready + day JSON
+        </a>
+        <a
+          href="/api/admin/export?format=m3u&scope=ready+day"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Ready + day M3U
+        </a>
+      </div>
+    </section>
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4">
+      <h2 class="font-display text-xl font-bold">Outpost transmissions</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        Listen-page email list in D1 <span class="font-mono text-amber">outpost_signups</span> (same MASTER database).
+        CSV is created/updated/status/source/email/name/x_handle/facebook_handle/shoutout_ok — no unsubscribe tokens.
+      </p>
+      <div class="mt-4 flex flex-wrap gap-3">
+        <a
+          href="/api/admin/outpost-export"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Signup CSV
+        </a>
+      </div>
+    </section>
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4">
+      <h2 class="font-display text-xl font-bold">Desk history</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        Plays logged here after Live365 metadata matches a queued request, or after a manual Mark played.
+      </p>
+      {
+        deskHistory.length === 0 ? (
+          <p class="mt-4 font-serif text-ink/80">Nothing logged yet.</p>
+        ) : (
+          <ol class="mt-4 space-y-1 font-mono text-sm">
+            {deskHistory.map(({ play, track }) => (
+              <li class="text-ink/90">
+                <span class="text-dim">{track.artist}</span> — {track.title}
+                <span class="ml-2 text-[0.65rem] uppercase tracking-[0.14em] text-muted">{play.source}</span>
+              </li>
+            ))}
+          </ol>
+        )
+      }
+    </section>
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4" data-air-log>
+      <h2 class="font-display text-xl font-bold">Air log</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        Harvested from Live365 on-air metadata (current-track and last-played), not a full library sync. Unique by
+        folded artist/title; the desk keeps 4000 titles and drops the oldest last-seen. Promote a row so listener
+        requests stop failing unknown_track — album and duration stay blank when Live365 did not send them.
+      </p>
+      <p class="mt-2 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+        {airTotal} unique {airTotal === 1 ? 'title' : 'titles'} harvested
+      </p>
+
+      <div class="mt-4 flex flex-wrap gap-3">
+        <a
+          href="/api/admin/air-log?format=json"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Air log JSON
+        </a>
+        <a
+          href="/api/admin/air-log?format=csv"
+          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Air log CSV
+        </a>
+      </div>
+
+      <form method="get" action="/admin" class="mt-4 flex flex-wrap gap-2">
+        <label class="min-w-[12rem] flex-1">
+          <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Search air log</span>
+          <input
+            name="air"
+            value={airQuery}
+            type="search"
+            placeholder="artist or title"
+            class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink placeholder:text-dim focus:border-amber focus:outline-none"
+          />
+        </label>
+        <button
+          type="submit"
+          class="self-end border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+        >
+          Search
+        </button>
+      </form>
+
+      {
+        airRows.length === 0 ? (
+          <p class="mt-4 font-serif text-ink/80">
+            {airTotal === 0
+              ? 'Nothing harvested yet. Listen-page polls and this desk load both write the log when Live365 metadata lands.'
+              : 'No titles match that search.'}
+          </p>
+        ) : (
+          <form data-air-promote class="mt-4">
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[44rem] text-left font-mono text-xs">
+                <thead class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+                  <tr>
+                    <th class="py-2 pr-3"> </th>
+                    <th class="py-2 pr-3">Track</th>
+                    <th class="py-2 pr-3">First</th>
+                    <th class="py-2 pr-3">Last</th>
+                    <th class="py-2 pr-3">Plays</th>
+                    <th class="py-2"> </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {airRows.map((entry) => {
+                    const inCatalog = airLogInCatalog(entry, state);
+                    return (
+                      <tr class="border-t border-line align-top">
+                        <td class="py-2 pr-3">
+                          {inCatalog ? null : (
+                            <input type="checkbox" name="keys" value={entry.key} data-air-key={entry.key} />
+                          )}
+                        </td>
+                        <td class="py-2 pr-3 text-ink/90">
+                          <span class="text-dim">{entry.artist}</span> — {entry.title}
+                        </td>
+                        <td class="py-2 pr-3 text-dim">
+                          {entry.firstSeenAt.replace('T', ' ').replace('Z', ' UTC')}
+                        </td>
+                        <td class="py-2 pr-3 text-dim">
+                          {entry.lastSeenAt.replace('T', ' ').replace('Z', ' UTC')}
+                        </td>
+                        <td class="py-2 pr-3 text-amber">{entry.plays}</td>
+                        <td class="py-2">
+                          {inCatalog ? (
+                            <span class="text-signal">In catalog</span>
+                          ) : (
+                            <button type="button" data-promote={entry.key} class="text-amber hover:text-ink">
+                              Add to request catalog
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                data-promote-selected
+                class="border border-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+              >
+                Add selected
+              </button>
+              <p data-air-status class="font-mono text-xs text-muted" role="status"></p>
+            </div>
+          </form>
+        )
+      }
+    </section>
+
+    <section class="mt-10 border border-line bg-panel px-4 py-4" data-master-lib>
+      <h2 class="font-display text-xl font-bold">Dropbox master vs Live365 air log</h2>
+      <p class="mt-1 font-serif text-ink/80">
+        Upload <code class="font-mono text-amber">master.csv</code> from the local Dropbox scanner. The Worker does not
+        talk to Dropbox. Diff is against the harvested air log (current-track + last-played), not a Live365 library
+        dump — they have no public library export.
+      </p>
+
+      {
+        !masterBound ? (
+          <p class="mt-4 font-serif text-ink/80">
+            {masterNote ??
+              'D1 binding MASTER is not on this Worker yet. Bind MASTER to badradio-master, apply migrations, redeploy. See README.'}
+          </p>
+        ) : (
+          <div>
+            <dl class="mt-4 grid gap-3 font-mono text-sm sm:grid-cols-2 lg:grid-cols-5">
+              <div class="border border-line bg-void px-3 py-2">
+                <dt class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">Master</dt>
+                <dd class="mt-1 text-lg text-ink">{masterCounts.masterTotal}</dd>
+              </div>
+              <div class="border border-line bg-void px-3 py-2">
+                <dt class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">Air log</dt>
+                <dd class="mt-1 text-lg text-ink">{masterCounts.airTotal}</dd>
+              </div>
+              <div class="border border-line bg-void px-3 py-2">
+                <dt class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">Heard on Live365</dt>
+                <dd class="mt-1 text-lg text-ink">{masterCounts.intersection}</dd>
+              </div>
+              <div class="border border-line bg-void px-3 py-2">
+                <dt class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">Master not aired</dt>
+                <dd class="mt-1 text-lg text-ink">{masterCounts.masterOnly}</dd>
+              </div>
+              <div class="border border-line bg-void px-3 py-2">
+                <dt class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">Aired, not in Dropbox</dt>
+                <dd class="mt-1 text-lg text-ink">{masterCounts.airOnly}</dd>
+              </div>
+            </dl>
+
+            <form class="mt-4 flex flex-wrap items-end gap-3" data-master-import>
+              <label class="block">
+                <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">master.csv or NDJSON</span>
+                <input
+                  type="file"
+                  name="file"
+                  accept=".csv,.json,.ndjson,text/csv,application/json"
+                  class="mt-1 block font-mono text-xs text-ink"
+                />
+              </label>
+              <button
+                type="submit"
+                class="border border-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+              >
+                Import master
+              </button>
+              <p data-master-import-status class="font-mono text-xs text-muted" role="status"></p>
+            </form>
+
+            <div class="mt-4 flex flex-wrap gap-3">
+              <a
+                href="/admin?lib=master-only"
+                class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+              >
+                Master not in air log
+              </a>
+              <a
+                href="/admin?lib=intersection"
+                class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+              >
+                Intersection
+              </a>
+              <a
+                href="/admin?lib=air-only"
+                class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+              >
+                Air log not in master
+              </a>
+              <a
+                href="/api/admin/master-diff?bucket=master-only&format=csv"
+                class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+              >
+                CSV: upload candidates
+              </a>
+              <a
+                href="/api/admin/master-diff?bucket=air-only&format=csv"
+                class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+              >
+                CSV: air not in master
+              </a>
+            </div>
+
+            <p class="mt-4 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+              Showing {libBucket} — page {libPage} of {libPages}
+            </p>
+
+            {
+              libBucket === 'air-only' ? (
+                libAirRows.length === 0 ? (
+                  <p class="mt-3 font-serif text-ink/80">This bucket is empty.</p>
+                ) : (
+                  <ul class="mt-3 space-y-1 font-mono text-sm">
+                    {libAirRows.map((row) => (
+                      <li>
+                        <span class="text-dim">{row.artist}</span> — {row.title}
+                        <span class="ml-2 text-[0.65rem] uppercase tracking-[0.14em] text-muted">{row.plays} plays</span>
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : libRows.length === 0 ? (
+                <p class="mt-3 font-serif text-ink/80">This bucket is empty. Import master.csv if the count is zero.</p>
+              ) : (
+                <form data-master-promote class="mt-3">
+                  <div class="overflow-x-auto">
+                    <table class="w-full min-w-[40rem] text-left font-mono text-xs">
+                      <thead class="text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+                        <tr>
+                          <th class="py-2 pr-3"> </th>
+                          <th class="py-2 pr-3">Track</th>
+                          <th class="py-2 pr-3">Album</th>
+                          <th class="py-2">Folder</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {libRows.map((row) => (
+                          <tr class="border-t border-line align-top">
+                            <td class="py-2 pr-3">
+                              <input type="checkbox" value={row.id} data-master-key={row.id} />
+                            </td>
+                            <td class="py-2 pr-3 text-ink/90">
+                              <span class="text-dim">{row.artist}</span> — {row.title}
+                            </td>
+                            <td class="py-2 pr-3 text-dim">{row.album ?? '—'}</td>
+                            <td class="py-2 text-dim">{row.folderRoot ?? ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      data-master-promote-selected
+                      class="border border-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+                    >
+                      Add selected to request catalog
+                    </button>
+                    {
+                      libBucket === 'intersection' ? (
+                        <button
+                          type="button"
+                          data-master-promote-intersection
+                          class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+                        >
+                          Promote intersection (up to 400)
+                        </button>
+                      ) : null
+                    }
+                    <p data-master-promote-status class="self-center font-mono text-xs text-muted" role="status"></p>
+                  </div>
+                </form>
+              )
+            }
+
+            {
+              libPages > 1 ? (
+                <p class="mt-4 font-mono text-xs">
+                  {libPage > 1 ? (
+                    <a class="text-amber hover:text-ink" href={`/admin?lib=${libBucket}&lp=${libPage - 1}`}>
+                      Previous
+                    </a>
+                  ) : null}
+                  {libPage < libPages ? (
+                    <a class="ml-3 text-amber hover:text-ink" href={`/admin?lib=${libBucket}&lp=${libPage + 1}`}>
+                      Next
+                    </a>
+                  ) : null}
+                </p>
+              ) : null
+            }
+          </div>
+        )
+      }
+    </section>
+  </main>
+  <SiteFooter />
+</Base>
+
+<script>
+  function initPlaylist(root: HTMLElement) {
+    const list = root.querySelector<HTMLOListElement>('[data-pl-list]');
+    const add = root.querySelector<HTMLSelectElement>('[data-pl-add]');
+    const save = root.querySelector<HTMLButtonElement>('[data-pl-save]');
+    const name = root.querySelector<HTMLInputElement>('[data-pl-name]');
+    const daypart = root.querySelector<HTMLInputElement>('[data-pl-daypart]');
+    const status = root.querySelector<HTMLElement>('[data-pl-status]');
+    if (!list || !add || !save || !name || !daypart || !status) return;
+
+    const ids = () =>
+      [...list.querySelectorAll<HTMLElement>('[data-pl-id]')].map((row) => row.dataset.plId).filter((id): id is string => !!id);
+
+    list.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const row = target.closest<HTMLElement>('[data-pl-id]');
+      if (!row) return;
+      if (target.matches('[data-pl-remove]')) {
+        row.remove();
+        return;
+      }
+      if (target.matches('[data-pl-up]') && row.previousElementSibling) {
+        row.parentElement?.insertBefore(row, row.previousElementSibling);
+      }
+      if (target.matches('[data-pl-down]') && row.nextElementSibling) {
+        row.parentElement?.insertBefore(row.nextElementSibling, row);
+      }
+    });
+
+    add.addEventListener('change', () => {
+      const option = add.selectedOptions[0];
+      if (!option?.value) return;
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-2 px-3 py-2 font-mono text-sm';
+      li.dataset.plId = option.value;
+      li.innerHTML = `<span class="min-w-0 flex-1">${option.textContent ?? option.value}</span>
+        <button type="button" data-pl-up class="text-muted hover:text-amber">Up</button>
+        <button type="button" data-pl-down class="text-muted hover:text-amber">Down</button>
+        <button type="button" data-pl-remove class="text-filament hover:text-ink">Remove</button>`;
+      list.appendChild(li);
+      add.value = '';
+    });
+
+    save.addEventListener('click', async () => {
+      status.textContent = 'Saving…';
+      const response = await fetch('/api/admin/playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.value, daypart: daypart.value, trackIds: ids() }),
+      });
+      const data = (await response.json()) as { ok?: boolean; message?: string };
+      status.textContent = data.ok ? 'Day set saved.' : (data.message ?? 'Save failed');
+      if (data.ok) status.classList.add('text-signal');
+    });
+  }
+
+  const editor = document.querySelector<HTMLElement>('[data-playlist-editor]');
+  if (editor) initPlaylist(editor);
+
+  document.querySelector<HTMLFormElement>('[data-pick-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const status = document.querySelector<HTMLElement>('[data-pick-status]');
+    const response = await fetch('/api/admin/pick', { method: 'POST' });
+    const data = (await response.json()) as {
+      ok?: boolean;
+      message?: string;
+      track?: { artist: string; title: string };
+    };
+    if (status) {
+      status.textContent = data.ok && data.track ? `Logged ${data.track.artist} — ${data.track.title}` : (data.message ?? 'Refused');
+    }
+    if (data.ok) window.location.reload();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-played]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const requestId = button.dataset.played;
+      if (!requestId) return;
+      await fetch('/api/admin/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, action: 'played' }),
+      });
+      window.location.reload();
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-reject]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const requestId = button.dataset.reject;
+      if (!requestId) return;
+      await fetch('/api/admin/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, reason: 'rejected by desk' }),
+      });
+      window.location.reload();
+    });
+  });
+
+  async function promoteKeys(keys: string[], status?: HTMLElement | null) {
+    if (keys.length === 0) {
+      if (status) status.textContent = 'Select at least one title.';
+      return;
+    }
+    if (status) status.textContent = 'Adding…';
+    const response = await fetch('/api/admin/air-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys }),
+    });
+    const data = (await response.json()) as { ok?: boolean; promoted?: unknown[]; message?: string };
+    if (data.ok) {
+      window.location.reload();
+      return;
+    }
+    if (status) status.textContent = data.message ?? 'Promote failed';
+  }
+
+  const airRoot = document.querySelector<HTMLElement>('[data-air-log]');
+  if (airRoot) {
+    const status = airRoot.querySelector<HTMLElement>('[data-air-status]');
+    airRoot.querySelectorAll<HTMLButtonElement>('[data-promote]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const key = button.dataset.promote;
+        if (key) void promoteKeys([key], status);
+      });
+    });
+    airRoot.querySelector<HTMLButtonElement>('[data-promote-selected]')?.addEventListener('click', () => {
+      const keys = [...airRoot.querySelectorAll<HTMLInputElement>('[data-air-key]:checked')].map((input) => input.value);
+      void promoteKeys(keys, status);
+    });
+  }
+
+  const masterRoot = document.querySelector<HTMLElement>('[data-master-lib]');
+  if (masterRoot) {
+    masterRoot.querySelector<HTMLFormElement>('[data-master-import]')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const status = masterRoot.querySelector<HTMLElement>('[data-master-import-status]');
+      const input = masterRoot.querySelector<HTMLInputElement>('input[type="file"]');
+      const file = input?.files?.[0];
+      if (!file) {
+        if (status) status.textContent = 'Choose master.csv first.';
+        return;
+      }
+      if (status) status.textContent = 'Importing…';
+      const body = new FormData();
+      body.set('file', file);
+      const response = await fetch('/api/admin/master-import', { method: 'POST', body });
+      const data = (await response.json()) as {
+        ok?: boolean;
+        inserted?: number;
+        updated?: number;
+        skipped?: number;
+        message?: string;
+      };
+      if (status) {
+        status.textContent = data.ok
+          ? `Inserted ${data.inserted ?? 0}, updated ${data.updated ?? 0}, skipped ${data.skipped ?? 0}`
+          : (data.message ?? 'Import failed');
+      }
+      if (data.ok) window.location.reload();
+    });
+
+    const promoteStatus = masterRoot.querySelector<HTMLElement>('[data-master-promote-status]');
+    const promoteMaster = async (payload: { keys?: string[]; bucket?: string }) => {
+      if (promoteStatus) promoteStatus.textContent = 'Adding…';
+      const response = await fetch('/api/admin/master-diff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = (await response.json()) as { ok?: boolean; promoted?: unknown[]; skipped?: number; message?: string };
+      if (data.ok) {
+        window.location.reload();
+        return;
+      }
+      if (promoteStatus) promoteStatus.textContent = data.message ?? 'Promote failed';
+    };
+
+    masterRoot.querySelector<HTMLButtonElement>('[data-master-promote-selected]')?.addEventListener('click', () => {
+      const keys = [...masterRoot.querySelectorAll<HTMLInputElement>('[data-master-key]:checked')].map((input) => input.value);
+      if (keys.length === 0) {
+        if (promoteStatus) promoteStatus.textContent = 'Select at least one title.';
+        return;
+      }
+      void promoteMaster({ keys });
+    });
+    masterRoot.querySelector<HTMLButtonElement>('[data-master-promote-intersection]')?.addEventListener('click', () => {
+      void promoteMaster({ bucket: 'intersection' });
+    });
+  }
+</script>

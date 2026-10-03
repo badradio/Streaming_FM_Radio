@@ -1,0 +1,148 @@
+---
+interface Props {
+  flash?: string;
+}
+
+const { flash = '' } = Astro.props;
+---
+
+<section
+  class="relative border border-line bg-panel px-4 py-5 pb-10"
+  data-outpost-signup
+  aria-labelledby="outpost-heading"
+>
+  <div class="panther-loaf-slot pointer-events-none absolute -right-1 -bottom-1" aria-hidden="true">
+    <slot name="loaf" />
+  </div>
+  <h2 id="outpost-heading" class="font-display text-xl font-bold tracking-tight">Outpost transmissions</h2>
+  <p class="mt-2 max-w-xl font-serif text-ink/80">
+    Occasional station notes — not a request confirmation, not a paywall. Play stays free.
+  </p>
+  <form
+    class="relative z-10 mt-4 flex flex-col gap-3"
+    method="post"
+    action="/api/outpost/signup"
+    data-outpost-form
+  >
+    <input type="hidden" name="source" value="listen" />
+    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <label class="block min-w-[12rem] flex-1">
+        <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Email</span>
+        <input
+          type="email"
+          name="email"
+          required
+          autocomplete="email"
+          class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink outline-none focus:border-amber"
+        />
+      </label>
+      <label class="block min-w-[10rem] flex-1">
+        <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Name (optional)</span>
+        <input
+          type="text"
+          name="name"
+          maxlength="80"
+          autocomplete="nickname"
+          class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink outline-none focus:border-amber"
+        />
+      </label>
+    </div>
+    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <label class="block min-w-[10rem] flex-1">
+        <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">X handle (optional)</span>
+        <input
+          type="text"
+          name="x_handle"
+          maxlength="80"
+          autocomplete="off"
+          placeholder="@yourname"
+          class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink outline-none focus:border-amber"
+        />
+      </label>
+      <label class="block min-w-[10rem] flex-1">
+        <span class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Facebook (optional)</span>
+        <input
+          type="text"
+          name="facebook_handle"
+          maxlength="80"
+          autocomplete="off"
+          placeholder="facebook.com/yourname"
+          class="mt-1 w-full border border-line bg-void px-3 py-2 font-mono text-sm text-ink outline-none focus:border-amber"
+        />
+      </label>
+    </div>
+    <label class="flex items-start gap-2 font-serif text-sm text-ink/85">
+      <input
+        type="checkbox"
+        name="shoutout_ok"
+        value="1"
+        class="mt-1 size-4 shrink-0 accent-amber"
+      />
+      <span>OK to give me a shout-out on social?</span>
+    </label>
+    <button
+      type="submit"
+      class="self-start border border-amber px-4 py-2 font-mono text-xs uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+    >
+      Join the list
+    </button>
+  </form>
+  <p class="relative z-10 mt-3 max-w-xl font-mono text-[0.7rem] leading-relaxed text-dim">
+    We keep your email (and optional social handles if you add them) in our station database for this list
+    and, if you check shout-out, for an on-air / social mention. Unsubscribe any time.
+    <a class="text-muted underline decoration-line underline-offset-2 hover:text-amber" href="/outpost/unsubscribe">Unsubscribe</a>.
+  </p>
+  <p data-outpost-status class="relative z-10 mt-2 min-h-[1.25rem] font-mono text-xs text-muted" role="status">
+    {flash}
+  </p>
+</section>
+
+<script>
+  function stripOutpostQuery() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('outpost')) return;
+    url.searchParams.delete('outpost');
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, '', next);
+  }
+
+  function initOutpost(root: HTMLElement) {
+    const form = root.querySelector<HTMLFormElement>('[data-outpost-form]');
+    const status = root.querySelector<HTMLElement>('[data-outpost-status]');
+    if (!form || !status) return;
+
+    stripOutpostQuery();
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      status.textContent = 'Sending…';
+      try {
+        const response = await fetch('/api/outpost/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            email: String(data.get('email') ?? '').trim(),
+            name: String(data.get('name') ?? '').trim(),
+            source: 'listen',
+            xHandle: String(data.get('x_handle') ?? '').trim(),
+            facebookHandle: String(data.get('facebook_handle') ?? '').trim(),
+            shoutoutOk: data.get('shoutout_ok') === '1',
+          }),
+        });
+        const result = (await response.json()) as { ok?: boolean; message?: string };
+        if (result.ok) {
+          status.textContent = 'You are on the list.';
+          window.__badradioTrack?.('signup_submit');
+          form.reset();
+          return;
+        }
+        status.textContent = result.message ?? 'Could not join the list.';
+      } catch {
+        status.textContent = 'Could not join the list. Play still works.';
+      }
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-outpost-signup]').forEach(initOutpost);
+</script>

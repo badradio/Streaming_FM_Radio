@@ -1,0 +1,43 @@
+---
+import { getAnalyticsConfig } from '../lib/analytics';
+
+const { beaconToken, gaMeasurementId } = await getAnalyticsConfig();
+const beaconPayload = beaconToken ? JSON.stringify({ token: beaconToken }) : '';
+const gaId = gaMeasurementId ?? '';
+---
+
+{
+  beaconToken ? (
+    <script is:inline defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon={beaconPayload}
+    ></script>
+  ) : null
+}
+{
+  gaId ? <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script> : null
+}
+
+<script define:vars={{ gaId }}>
+  window.__badradioTrack = function (name) {
+    if (name !== 'play_click' && name !== 'signup_submit') return;
+    try {
+      if (window.zaraz && typeof window.zaraz.track === 'function') window.zaraz.track(name);
+    } catch (err) {
+      /* analytics must never break play */
+    }
+    try {
+      if (typeof window.gtag === 'function') window.gtag('event', name);
+    } catch (err) {
+      /* same */
+    }
+  };
+  if (gaId) {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag =
+      window.gtag ||
+      function gtag() {
+        window.dataLayer.push(arguments);
+      };
+    window.gtag('js', new Date());
+    window.gtag('config', gaId, { anonymize_ip: true });
+  }
+</script>

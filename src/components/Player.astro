@@ -1,0 +1,211 @@
+---
+interface Props {
+  streamUrl: string;
+  size?: 'full' | 'compact';
+}
+
+const { streamUrl, size = 'full' } = Astro.props;
+const connected = streamUrl.length > 0;
+const compact = size === 'compact';
+---
+
+<div
+  class:list={['player shrink-0', compact && 'player-compact']}
+  data-player
+  data-stream-url={streamUrl}
+  data-connected={connected ? 'true' : 'false'}
+  data-player-size={size}
+>
+  <audio data-player-audio preload="none"></audio>
+
+  <button
+    type="button"
+    data-player-button
+    disabled={!connected}
+    aria-pressed="false"
+    aria-disabled={connected ? undefined : 'true'}
+    aria-label={connected ? 'Play live stream' : 'Stream not connected'}
+    class:list={[
+      'group relative flex items-center justify-center rounded-full border-2 border-amber text-amber transition-colors [-webkit-tap-highlight-color:transparent] enabled:hover:bg-amber enabled:hover:text-void enabled:active:bg-amber/80 enabled:focus-visible:outline-2 enabled:focus-visible:outline-offset-4 enabled:focus-visible:outline-amber disabled:pointer-events-none disabled:border-line disabled:text-dim disabled:opacity-45',
+      compact ? 'size-14 sm:size-16' : 'size-36 sm:size-44',
+    ]}
+  >
+    <span class="pointer-events-none absolute inset-2 rounded-full border border-amber/20 group-disabled:border-line/40"></span>
+    <svg
+      data-icon-play
+      class:list={[compact ? 'ml-0.5 size-6' : 'ml-1 size-14 sm:size-16']}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="currentColor"
+    >
+      <path d="M8 5.14v13.72L19.5 12 8 5.14z"></path>
+    </svg>
+    <svg
+      data-icon-pause
+      class:list={['hidden', compact ? 'size-6' : 'size-14 sm:size-16']}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="currentColor"
+    >
+      <path d="M7 5h4v14H7V5zm6 0h4v14h-4V5z"></path>
+    </svg>
+  </button>
+
+  <p
+    data-player-status
+    class:list={[
+      compact
+        ? 'mt-2 max-w-[7rem] font-mono text-[0.6rem] uppercase tracking-[0.16em] text-muted'
+        : 'mt-4 max-w-[16rem] font-mono text-[0.7rem] uppercase tracking-[0.18em] text-muted',
+    ]}
+    role="status"
+    aria-live="polite"
+  >
+    {
+      connected ? (
+        'Ready — hit play'
+      ) : (
+        <>
+          Stream not connected
+          {
+            compact ? null : (
+              <span class="mt-1 block normal-case tracking-normal text-dim">
+                Set PUBLIC_STREAM_URL to enable the origin.
+              </span>
+            )
+          }
+        </>
+      )
+    }
+  </p>
+</div>
+
+<script>
+  type NowDetail = { artist?: string; title?: string; art?: string };
+
+  function initPlayer(root: HTMLElement) {
+    const audio = root.querySelector<HTMLAudioElement>('[data-player-audio]');
+    const button = root.querySelector<HTMLButtonElement>('[data-player-button]');
+    const status = root.querySelector<HTMLElement>('[data-player-status]');
+    const playIcon = root.querySelector<SVGElement>('[data-icon-play]');
+    const pauseIcon = root.querySelector<SVGElement>('[data-icon-pause]');
+    if (!audio || !button || !status || !playIcon || !pauseIcon) return;
+
+    const streamUrl = root.dataset.streamUrl?.trim() ?? '';
+    const connected = root.dataset.connected === 'true' && streamUrl.length > 0;
+    let now: NowDetail = {};
+
+    const setStatus = (text: string, live: boolean) => {
+      status.textContent = text;
+      status.classList.toggle('text-signal', live);
+      status.classList.toggle('pulse-live', live);
+      status.classList.toggle('text-filament', text.toLowerCase().includes("can't"));
+      status.classList.toggle('text-muted', !live && !text.toLowerCase().includes("can't"));
+    };
+
+    const artworkFor = (art?: string) => {
+      const fallback = [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }];
+      if (art && /^https?:/i.test(art)) {
+        return [{ src: art, sizes: '512x512', type: 'image/jpeg' }, ...fallback];
+      }
+      return fallback;
+    };
+
+    const syncMediaSession = (playing: boolean | null) => {
+      if (!('mediaSession' in navigator)) return;
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: now.title?.trim() || 'badradio',
+          artist: now.artist?.trim() || 'badradio',
+          album: 'badradio',
+          artwork: artworkFor(now.art),
+        });
+        if (playing !== null) {
+          navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+        }
+      } catch {
+        /* lock-screen metadata is best-effort */
+      }
+    };
+
+    const setPlaying = (playing: boolean) => {
+      button.setAttribute('aria-pressed', String(playing));
+      button.setAttribute('aria-label', playing ? 'Pause live stream' : 'Play live stream');
+      playIcon.classList.toggle('hidden', playing);
+      pauseIcon.classList.toggle('hidden', !playing);
+      syncMediaSession(playing);
+    };
+
+    if (!connected) {
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+      button.setAttribute('aria-label', 'Stream not connected');
+      return;
+    }
+
+    audio.src = streamUrl;
+
+    const play = async () => {
+      setStatus('Connecting to origin…', false);
+      try {
+        await audio.play();
+      } catch {
+        setPlaying(false);
+        setStatus("Can't reach origin", false);
+      }
+    };
+
+    button.addEventListener('click', () => {
+      if (audio.paused) {
+        window.__badradioTrack?.('play_click');
+        void play();
+      } else {
+        audio.pause();
+      }
+    });
+
+    audio.addEventListener('playing', () => {
+      setPlaying(true);
+      setStatus('On air', true);
+    });
+
+    audio.addEventListener('pause', () => {
+      setPlaying(false);
+      setStatus('Paused', false);
+    });
+
+    audio.addEventListener('waiting', () => {
+      setStatus('Connecting to origin…', false);
+    });
+
+    audio.addEventListener('error', () => {
+      setPlaying(false);
+      setStatus("Can't reach origin", false);
+    });
+
+    window.addEventListener('badradio:now', ((event: Event) => {
+      const detail = (event as CustomEvent<NowDetail>).detail;
+      if (!detail || typeof detail !== 'object') return;
+      now = detail;
+      syncMediaSession(audio.paused ? false : true);
+    }) as EventListener);
+
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('play', () => {
+          void play();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          audio.pause();
+        });
+        navigator.mediaSession.setActionHandler('stop', () => {
+          audio.pause();
+        });
+      } catch {
+        /* some browsers reject handlers */
+      }
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-player]').forEach(initPlayer);
+</script>

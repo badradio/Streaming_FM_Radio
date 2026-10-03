@@ -1,0 +1,219 @@
+---
+import type { Live365Result } from '../lib/live365/normalize';
+import Panther from './Panther.astro';
+
+interface Props {
+  initial: Live365Result;
+}
+
+const { initial } = Astro.props;
+const now = initial.ok ? initial.now : null;
+const recent = initial.ok ? initial.recent : [];
+const live = initial.ok && !!now;
+const badge = live ? 'On air — Live365' : initial.ok ? 'Live365 — nothing listed' : 'On-air metadata unavailable';
+const seed = JSON.stringify(initial).replace(/</g, '\\u003c');
+---
+
+<div data-on-air class="space-y-8">
+  <script type="application/json" data-on-air-seed set:html={seed}></script>
+
+  <div class="flex flex-col gap-10 sm:flex-row sm:items-end">
+    <slot />
+    <section aria-labelledby="now-playing-heading" class="min-w-0 flex-1">
+      <p
+        data-on-air-badge
+        class="mb-3 inline-block border border-amber/50 bg-amber/10 px-2 py-0.5 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-amber"
+      >
+        {badge}
+      </p>
+      <p id="now-playing-heading" class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Now playing</p>
+      <div data-on-air-now>
+        {
+          now ? (
+            <>
+              <p
+                data-on-air-artist
+                class="mt-2 font-display text-4xl font-extrabold leading-[0.95] tracking-tight text-ink sm:text-5xl lg:text-6xl"
+              >
+                {now.artist}
+              </p>
+              <p data-on-air-title class="mt-3 font-serif text-xl text-ink/90 sm:text-2xl">
+                {now.title}
+              </p>
+            </>
+          ) : (
+            <>
+              <p
+                data-on-air-artist
+                class="mt-2 font-display text-4xl font-extrabold leading-[0.95] tracking-tight text-ink sm:text-5xl"
+              >
+                Nothing on air listed
+              </p>
+              <p data-on-air-title class="mt-3 font-serif text-xl text-ink/90">
+                Metadata comes from Live365 when the mount is up. Requests still play later, not next.
+              </p>
+            </>
+          )
+        }
+      </div>
+    </section>
+  </div>
+
+  <section aria-labelledby="recent-heading" class="relative border border-line bg-panel px-4 py-4">
+    <div class="pointer-events-none absolute -top-5 right-8 z-10" aria-hidden="true">
+      <Panther pose="peek" />
+    </div>
+    <h2 id="recent-heading" class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Recently played</h2>
+    <p class="mt-1 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-dim">
+      What already aired — not what’s next
+    </p>
+    <div data-on-air-recent>
+      {
+        recent.length === 0 ? (
+          <p class="mt-3 font-serif text-ink/80">No recent tracks from Live365 yet.</p>
+        ) : (
+          <ol class="mt-3 space-y-2 font-mono text-sm">
+            {recent.map((item) => (
+              <li class="text-ink/90">
+                <span class="text-dim">{item.artist}</span>
+                <span class="text-dim"> — </span>
+                {item.title}
+              </li>
+            ))}
+          </ol>
+        )
+      }
+    </div>
+    <div
+      data-on-air-empty-panther
+      class="pointer-events-none mt-4 max-w-[10rem]"
+      hidden={recent.length > 0}
+      aria-hidden="true"
+    >
+      <Panther pose="lounge" />
+    </div>
+  </section>
+</div>
+
+<script>
+  type Track = { artist: string; title: string; art?: string };
+  type Feed =
+    | { ok: true; isPlaying?: boolean; now: Track | null; recent: Track[] }
+    | { ok: false; reason?: string; now: null; recent: [] };
+
+  const LIVE_MS = 18_000;
+  const HIDDEN_MS = 60_000;
+
+  function publishNow(now: Track | null) {
+    window.dispatchEvent(
+      new CustomEvent('badradio:now', {
+        detail: now
+          ? { artist: now.artist, title: now.title, art: now.art }
+          : { artist: 'badradio', title: 'Live' },
+      }),
+    );
+  }
+
+  function init(root: HTMLElement) {
+    const seedNode = root.querySelector<HTMLScriptElement>('[data-on-air-seed]');
+    const badge = root.querySelector<HTMLElement>('[data-on-air-badge]');
+    const artistEl = root.querySelector<HTMLElement>('[data-on-air-artist]');
+    const titleEl = root.querySelector<HTMLElement>('[data-on-air-title]');
+    const recentEl = root.querySelector<HTMLElement>('[data-on-air-recent]');
+    const emptyPanther = root.querySelector<HTMLElement>('[data-on-air-empty-panther]');
+    if (!seedNode || !badge || !artistEl || !titleEl || !recentEl) return;
+
+    let lastGood: Feed | null = null;
+    try {
+      lastGood = JSON.parse(seedNode.textContent || 'null') as Feed;
+    } catch {
+      lastGood = null;
+    }
+
+    const render = (feed: Feed, stale = false) => {
+      const now = feed.ok ? feed.now : null;
+      const recent = feed.ok ? feed.recent : [];
+      publishNow(now);
+      if (now) {
+        badge.textContent = stale ? 'On air — Live365 (last good)' : 'On air — Live365';
+        artistEl.textContent = now.artist;
+        titleEl.textContent = now.title;
+        titleEl.className = 'mt-3 font-serif text-xl text-ink/90 sm:text-2xl';
+      } else {
+        badge.textContent = feed.ok ? 'Live365 — nothing listed' : 'On-air metadata unavailable';
+        artistEl.textContent = 'Nothing on air listed';
+        titleEl.textContent = 'Metadata comes from Live365 when the mount is up. Requests still play later, not next.';
+        titleEl.className = 'mt-3 font-serif text-xl text-ink/90';
+      }
+
+      if (recent.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'mt-3 font-serif text-ink/80';
+        p.textContent = 'No recent tracks from Live365 yet.';
+        recentEl.replaceChildren(p);
+        if (emptyPanther) emptyPanther.hidden = false;
+        return;
+      }
+
+      if (emptyPanther) emptyPanther.hidden = true;
+
+      const ol = document.createElement('ol');
+      ol.className = 'mt-3 space-y-2 font-mono text-sm';
+      for (const item of recent) {
+        const li = document.createElement('li');
+        li.className = 'text-ink/90';
+        const artist = document.createElement('span');
+        artist.className = 'text-dim';
+        artist.textContent = item.artist;
+        const sep = document.createElement('span');
+        sep.className = 'text-dim';
+        sep.textContent = ' — ';
+        li.append(artist, sep, document.createTextNode(item.title));
+        ol.appendChild(li);
+      }
+      recentEl.replaceChildren(ol);
+    };
+
+    const pull = async () => {
+      try {
+        const response = await fetch('/api/now-playing', { headers: { Accept: 'application/json' } });
+        const data = (await response.json()) as Feed;
+        if (data && data.ok && (data.now || data.recent.length > 0)) {
+          lastGood = data;
+          render(data);
+          return;
+        }
+        if (lastGood?.ok) {
+          render(lastGood, true);
+          return;
+        }
+        render(data);
+      } catch {
+        if (lastGood?.ok) render(lastGood, true);
+      }
+    };
+
+    let timer: number | undefined;
+    const schedule = () => {
+      window.clearTimeout(timer);
+      const wait = document.visibilityState === 'hidden' ? HIDDEN_MS : LIVE_MS;
+      timer = window.setTimeout(async () => {
+        await pull();
+        schedule();
+      }, wait);
+    };
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        void pull().then(schedule);
+      } else {
+        schedule();
+      }
+    });
+
+    schedule();
+    if (lastGood) publishNow(lastGood.ok ? lastGood.now : null);
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-on-air]').forEach(init);
+</script>

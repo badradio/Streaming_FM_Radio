@@ -1,0 +1,16 @@
+---
+title: Schedule
+description: The day starts from a set list. Requests wait. No public clock grid.
+---
+
+The day starts from a **set playlist** the operator defines. That list is the spine. Listener requests go into a **queue**. They are not next, and they are not a time you pick.
+
+We do not publish an advance timed playlist — no “this exact song at 9:00.” What you get on the listen page is now playing and recently played. The desk can see more.
+
+Rules encoded in the software:
+
+- earliest play is at least one hour after the request
+- in any rolling 3-hour window: max 3 tracks from one album (max 2 consecutive), max 4 from one featured artist (max 3 consecutive)
+- queue insert and AutoDJ pick both refuse violations
+
+Live365 will host the licensed stream (library upload + their playlist/Event UI, or an Icecast source they relay). This site exports JSON/M3U as an operator checklist. Live365 does not import M3U today.

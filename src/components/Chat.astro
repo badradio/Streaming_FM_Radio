@@ -1,0 +1,104 @@
+---
+const examples = [
+  {
+    name: 'desk',
+    text: 'Example only — chat is not live in v0. No DJ backend.',
+  },
+  {
+    name: 'listener',
+    text: 'Example: this list is a shell. Messages are not broadcast.',
+  },
+];
+---
+
+<section
+  class="flex min-h-[22rem] flex-col border border-line bg-panel"
+  aria-labelledby="chat-heading"
+  data-chat
+>
+  <header class="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+    <div>
+      <h2 id="chat-heading" class="font-display text-lg font-bold tracking-tight">
+        Studio chat
+      </h2>
+      <p class="mt-0.5 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">
+        Chat goes live with the DJ next.
+      </p>
+    </div>
+    <p class="shrink-0 border border-line px-1.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.14em] text-dim">
+      UI shell
+    </p>
+  </header>
+
+  <ul
+    data-chat-list
+    class="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3 font-mono text-sm"
+  >
+    {
+      examples.map((line) => (
+        <li class="text-muted">
+          <span class="text-[0.6rem] uppercase tracking-[0.14em] text-amber">Example</span>
+          <p class="mt-0.5 text-ink/90">
+            <span class="text-dim">{line.name}:</span> {line.text}
+          </p>
+        </li>
+      ))
+    }
+  </ul>
+
+  <form data-chat-form class="border-t border-line p-3">
+    <label class="sr-only" for="chat-input">Message (local preview only)</label>
+    <div class="flex gap-2">
+      <input
+        id="chat-input"
+        data-chat-input
+        type="text"
+        maxlength="280"
+        autocomplete="off"
+        placeholder="Local preview — not sent to a studio"
+        class="min-w-0 flex-1 border border-line bg-void px-3 py-2 font-mono text-sm text-ink placeholder:text-dim focus:border-amber focus:outline-none"
+      />
+      <button
+        type="submit"
+        class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:border-amber hover:text-amber focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber"
+      >
+        Send
+      </button>
+    </div>
+    <p data-chat-note class="mt-2 font-mono text-[0.65rem] text-dim">
+      Typing stays in this browser. There is no chat Worker yet.
+    </p>
+  </form>
+</section>
+
+<script>
+  function initChat(root: HTMLElement) {
+    const form = root.querySelector<HTMLFormElement>('[data-chat-form]');
+    const input = root.querySelector<HTMLInputElement>('[data-chat-input]');
+    const list = root.querySelector<HTMLUListElement>('[data-chat-list]');
+    const note = root.querySelector<HTMLElement>('[data-chat-note]');
+    if (!form || !input || !list || !note) return;
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      const item = document.createElement('li');
+      item.className = 'text-muted';
+      item.innerHTML =
+        '<span class="text-[0.6rem] uppercase tracking-[0.14em] text-dim">Local only — not broadcast</span>' +
+        `<p class="mt-0.5 text-ink/90"><span class="text-dim">you:</span> </p>`;
+      const body = item.querySelector('p');
+      if (body) {
+        body.appendChild(document.createTextNode(text));
+      }
+      list.appendChild(item);
+      list.scrollTop = list.scrollHeight;
+      input.value = '';
+      note.textContent = 'Stayed local. Chat Worker is a later slice.';
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-chat]').forEach(initChat);
+</script>

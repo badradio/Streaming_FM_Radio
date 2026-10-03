@@ -1,0 +1,22 @@
+---
+import { Content, frontmatter } from '../content/station/schedule.mdx';
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+
+export const prerender = true;
+---
+
+<Base title={`${frontmatter.title} — Bad Radio`} description={frontmatter.description}>
+  <SiteHeader current="schedule" />
+  <main id="main" class="mx-auto max-w-2xl px-4 py-12 sm:px-6 sm:py-16">
+    <p class="font-mono text-xs uppercase tracking-[0.22em] text-muted">Station copy</p>
+    <h1 class="mt-3 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+      {frontmatter.title}
+    </h1>
+    <article class="prose-station mt-8 text-ink/90">
+      <Content />
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "badradio",
+  "compatibility_date": "2026-08-31",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "kv_namespaces": [
+    {
+      "binding": "STATION",
+      "id": "485b9fff90874ab9bb4bbeac7ecc8b80"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "MASTER",
+      "database_name": "badradio-master",
+      "database_id": "7313948e-4c70-4a8f-b81c-e32278c81051",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "workers_dev": true,
+  "preview_urls": true,
+  "observability": {
+    "enabled": true
+  },
+  "routes": [
+    { "pattern": "badradio.rocks", "custom_domain": true },
+    { "pattern": "www.badradio.rocks", "custom_domain": true },
+    { "pattern": "stream.badradio.rocks/*", "zone_name": "badradio.rocks" },
+    { "pattern": "stream-aac.badradio.rocks", "custom_domain": true }
+  ]
+}

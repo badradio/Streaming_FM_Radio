@@ -1,0 +1,190 @@
+---
+import { WIDGET_IFRAME_SNIPPET } from '../lib/embed-snippet';
+
+const snippet = WIDGET_IFRAME_SNIPPET;
+---
+
+<section
+  id="listen-anywhere"
+  data-listen-anywhere
+  class="border border-line bg-panel px-4 py-5"
+  aria-labelledby="listen-anywhere-heading"
+>
+  <p class="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-amber">Download / install</p>
+  <h2 id="listen-anywhere-heading" class="mt-1 font-display text-2xl font-extrabold tracking-tight text-ink">
+    listen anywhere
+  </h2>
+  <p class="mt-2 max-w-2xl font-serif text-ink/85">
+    Put badradio on the home screen or keep a small player on a page. Installs from your browser, no app store.
+  </p>
+
+  <div class="mt-4 flex flex-wrap gap-2">
+    <button
+      type="button"
+      data-install-app
+      class="border border-amber bg-amber px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-void hover:bg-amber/90"
+    >
+      Install app
+    </button>
+    <button
+      type="button"
+      data-pick="ios"
+      class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber data-[on=true]:border-amber data-[on=true]:text-amber"
+    >
+      iPhone / iPad
+    </button>
+    <button
+      type="button"
+      data-pick="android"
+      class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber data-[on=true]:border-amber data-[on=true]:text-amber"
+    >
+      Android
+    </button>
+    <button
+      type="button"
+      data-pick="desktop"
+      class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber data-[on=true]:border-amber data-[on=true]:text-amber"
+    >
+      Desktop
+    </button>
+    <a
+      href="/widget"
+      class="border border-line px-3 py-2 font-mono text-xs uppercase tracking-[0.14em] text-muted hover:text-amber"
+    >
+      Open the widget
+    </a>
+  </div>
+
+  <p data-install-status class="mt-3 font-mono text-[0.7rem] uppercase tracking-[0.12em] text-dim" role="status"></p>
+
+  <div data-panel="ios" hidden class="mt-4 border border-line px-3 py-3">
+    <p class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-amber">iPhone / iPad</p>
+    <ol class="mt-2 list-decimal space-y-1 pl-5 font-serif text-sm text-ink/85">
+      <li>Open this page in <strong>Safari</strong> (not Chrome or a shortcut inside another app).</li>
+      <li>Tap the <strong>Share</strong> button.</li>
+      <li>Tap <strong>Add to Home Screen</strong>, then Add.</li>
+    </ol>
+    <p class="mt-2 font-mono text-[0.7rem] text-dim">Safari only. Installs from your browser, no app store.</p>
+  </div>
+
+  <div data-panel="android" hidden class="mt-4 border border-line px-3 py-3">
+    <p class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-amber">Android</p>
+    <ol class="mt-2 list-decimal space-y-1 pl-5 font-serif text-sm text-ink/85">
+      <li>Open this page in <strong>Chrome</strong>.</li>
+      <li>Tap the menu (⋮), then <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+      <li>Or tap <strong>Install app</strong> above — Chrome will prompt when it can.</li>
+    </ol>
+    <p class="mt-2 font-mono text-[0.7rem] text-dim">Installs from your browser, no Play Store listing.</p>
+  </div>
+
+  <div data-panel="desktop" hidden class="mt-4 border border-line px-3 py-3">
+    <p class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-amber">Windows / Mac / Linux</p>
+    <ol class="mt-2 list-decimal space-y-1 pl-5 font-serif text-sm text-ink/85">
+      <li>Use <strong>Chrome</strong> or <strong>Edge</strong> on this page.</li>
+      <li>Look in the address bar for the <strong>Install</strong> icon (a monitor with a down arrow).</li>
+      <li>Or tap <strong>Install app</strong> above when Chromium offers it.</li>
+    </ol>
+    <p class="mt-2 font-mono text-[0.7rem] text-dim">Firefox and Safari on desktop do not install this PWA. No app store.</p>
+  </div>
+
+  <div class="mt-5 border border-line px-3 py-3">
+    <p class="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted">Copy embed</p>
+    <p class="mt-1 font-serif text-sm text-ink/80">Drop this iframe on badradio.com or any allowlisted page.</p>
+    <textarea
+      data-embed-snippet
+      readonly
+      rows="7"
+      class="mt-2 w-full resize-y border border-line bg-void px-3 py-2 font-mono text-[0.7rem] leading-relaxed text-ink outline-none focus:border-amber"
+    >{snippet}</textarea>
+    <button
+      type="button"
+      data-copy-embed
+      class="mt-2 border border-amber px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-amber hover:bg-amber hover:text-void"
+    >
+      Copy iframe
+    </button>
+  </div>
+</section>
+
+<script>
+  import { detectClientOs, highlightGroup } from '../lib/client-os';
+
+  function isStandalone() {
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches ||
+      ('standalone' in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
+    );
+  }
+
+  function init(root: HTMLElement) {
+    const picks = root.querySelectorAll<HTMLButtonElement>('[data-pick]');
+    const panels = root.querySelectorAll<HTMLElement>('[data-panel]');
+    const install = root.querySelector<HTMLButtonElement>('[data-install-app]');
+    const status = root.querySelector<HTMLElement>('[data-install-status]');
+    const copy = root.querySelector<HTMLButtonElement>('[data-copy-embed]');
+    const snippet = root.querySelector<HTMLTextAreaElement>('[data-embed-snippet]');
+    if (!install || !status) return;
+
+    const os = detectClientOs(navigator.userAgent, {
+      platform: navigator.platform,
+      maxTouchPoints: navigator.maxTouchPoints,
+    });
+    const initial = highlightGroup(os);
+
+    const show = (id: string) => {
+      for (const pick of picks) pick.dataset.on = String(pick.dataset.pick === id);
+      for (const panel of panels) panel.hidden = panel.dataset.panel !== id;
+    };
+
+    show(initial);
+
+    for (const pick of picks) {
+      pick.addEventListener('click', () => show(pick.dataset.pick ?? initial));
+    }
+
+    let deferred: { prompt: () => Promise<void> } | null = null;
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferred = event as unknown as { prompt: () => Promise<void> };
+      status.textContent = 'Chrome can install this now.';
+    });
+
+    install.addEventListener('click', async () => {
+      if (isStandalone()) {
+        status.textContent = 'Already on the home screen.';
+        return;
+      }
+      if (deferred) {
+        try {
+          await deferred.prompt();
+          status.textContent = 'Install prompt opened.';
+        } catch {
+          status.textContent = 'Install dismissed.';
+        }
+        deferred = null;
+        return;
+      }
+      show(highlightGroup(os));
+      if (os === 'ios') {
+        status.textContent = 'On iPhone: Safari → Share → Add to Home Screen.';
+        return;
+      }
+      status.textContent = 'Use the browser Install control — steps are below.';
+    });
+
+    copy?.addEventListener('click', async () => {
+      if (!snippet) return;
+      try {
+        await navigator.clipboard.writeText(snippet.value);
+        copy.textContent = 'Copied';
+      } catch {
+        snippet.focus();
+        snippet.select();
+        copy.textContent = 'Select and copy';
+      }
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-listen-anywhere]').forEach(init);
+</script>

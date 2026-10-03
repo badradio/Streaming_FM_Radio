@@ -1,0 +1,354 @@
+{
+  "tracks": [
+    {
+      "id": "ac-jis-journey",
+      "title": "Journey in Satchidananda",
+      "artist": "Alice Coltrane",
+      "album": "Journey in Satchidananda",
+      "year": 1971,
+      "isrc": null,
+      "durationSec": 389,
+      "audioUrl": null
+    },
+    {
+      "id": "ac-jis-shiva",
+      "title": "Shiva-Loka",
+      "artist": "Alice Coltrane",
+      "album": "Journey in Satchidananda",
+      "year": 1971,
+      "isrc": null,
+      "durationSec": 393,
+      "audioUrl": null
+    },
+    {
+      "id": "ac-jis-bombay",
+      "title": "Stopover Bombay",
+      "artist": "Alice Coltrane",
+      "album": "Journey in Satchidananda",
+      "year": 1971,
+      "isrc": null,
+      "durationSec": 152,
+      "audioUrl": null
+    },
+    {
+      "id": "ac-jis-john",
+      "title": "Something About John Coltrane",
+      "artist": "Alice Coltrane",
+      "album": "Journey in Satchidananda",
+      "year": 1971,
+      "isrc": null,
+      "durationSec": 581,
+      "audioUrl": null
+    },
+    {
+      "id": "ac-ptah-ptah",
+      "title": "Ptah, the El Daoud",
+      "artist": "Alice Coltrane",
+      "album": "Ptah, the El Daoud",
+      "year": 1970,
+      "isrc": null,
+      "durationSec": 838,
+      "audioUrl": null
+    },
+    {
+      "id": "ac-ptah-turiya",
+      "title": "Turiya and Ramakrishna",
+      "artist": "Alice Coltrane",
+      "album": "Ptah, the El Daoud",
+      "year": 1970,
+      "isrc": null,
+      "durationSec": 496,
+      "audioUrl": null
+    },
+    {
+      "id": "can-tm-paperhouse",
+      "title": "Paperhouse",
+      "artist": "Can",
+      "album": "Tago Mago",
+      "year": 1971,
+      "isrc": null,
+      "durationSec": 454,
+      "audioUrl": null
+    },
+    {
+      "id": "can-tm-mushroom",
+      "title": "Mushroom",
+      "artist": "Can",
+      "album": "Tago Mago",
+      "year": 1971,
+      "isrc": null,
+      "durationSec": 246,
+      "audioUrl": null
+    },
+    {
+      "id": "can-tm-ohyeah",
+      "title": "Oh Yeah",
+      "artist": "Can",
+      "album": "Tago Mago",
+      "year": 1971,
+      "isrc": null,
+      "durationSec": 443,
+      "audioUrl": null
+    },
+    {
+      "id": "can-eb-spoon",
+      "title": "Spoon",
+      "artist": "Can",
+      "album": "Ege Bamyasi",
+      "year": 1972,
+      "isrc": null,
+      "durationSec": 184,
+      "audioUrl": null
+    },
+    {
+      "id": "can-eb-vitamin",
+      "title": "Vitamin C",
+      "artist": "Can",
+      "album": "Ege Bamyasi",
+      "year": 1972,
+      "isrc": null,
+      "durationSec": 212,
+      "audioUrl": null
+    },
+    {
+      "id": "fela-zombie",
+      "title": "Zombie",
+      "artist": "Fela Kuti",
+      "album": "Zombie",
+      "year": 1976,
+      "isrc": null,
+      "durationSec": 745,
+      "audioUrl": null
+    },
+    {
+      "id": "fela-expensive",
+      "title": "Expensive Shit",
+      "artist": "Fela Kuti",
+      "album": "Expensive Shit",
+      "year": 1975,
+      "isrc": null,
+      "durationSec": 793,
+      "audioUrl": null
+    },
+    {
+      "id": "bc-nm-long",
+      "title": "Long Was the Year",
+      "artist": "Broadcast",
+      "album": "The Noise Made by People",
+      "year": 2000,
+      "isrc": null,
+      "durationSec": 203,
+      "audioUrl": null
+    },
+    {
+      "id": "bc-nm-pendulum",
+      "title": "Pendulum",
+      "artist": "Broadcast",
+      "album": "The Noise Made by People",
+      "year": 2000,
+      "isrc": null,
+      "durationSec": 256,
+      "audioUrl": null
+    },
+    {
+      "id": "bc-hs-pendula",
+      "title": "Pendulum",
+      "artist": "Broadcast",
+      "album": "Haha Sound",
+      "year": 2003,
+      "isrc": null,
+      "durationSec": 251,
+      "audioUrl": null
+    },
+    {
+      "id": "slits-typical",
+      "title": "Typical Girls",
+      "artist": "The Slits",
+      "album": "Cut",
+      "year": 1979,
+      "isrc": null,
+      "durationSec": 235,
+      "audioUrl": null
+    },
+    {
+      "id": "slits-instant",
+      "title": "Instant Hit",
+      "artist": "The Slits",
+      "album": "Cut",
+      "year": 1979,
+      "isrc": null,
+      "durationSec": 159,
+      "audioUrl": null
+    },
+    {
+      "id": "esg-moody",
+      "title": "Moody",
+      "artist": "ESG",
+      "album": "Come Away with ESG",
+      "year": 1983,
+      "isrc": null,
+      "durationSec": 171,
+      "audioUrl": null
+    },
+    {
+      "id": "esg-ufo",
+      "title": "UFO",
+      "artist": "ESG",
+      "album": "Come Away with ESG",
+      "year": 1983,
+      "isrc": null,
+      "durationSec": 162,
+      "audioUrl": null
+    },
+    {
+      "id": "stereo-brakhage",
+      "title": "Brakhage",
+      "artist": "Stereolab",
+      "album": "Dots and Loops",
+      "year": 1997,
+      "isrc": null,
+      "durationSec": 326,
+      "audioUrl": null
+    },
+    {
+      "id": "stereo-miss",
+      "title": "Miss Modular",
+      "artist": "Stereolab",
+      "album": "Dots and Loops",
+      "year": 1997,
+      "isrc": null,
+      "durationSec": 257,
+      "audioUrl": null
+    },
+    {
+      "id": "nmh-king",
+      "title": "King of Carrot Flowers Pt. 1",
+      "artist": "Neutral Milk Hotel",
+      "album": "In the Aeroplane Over the Sea",
+      "year": 1998,
+      "isrc": null,
+      "durationSec": 122,
+      "audioUrl": null
+    },
+    {
+      "id": "nmh-holland",
+      "title": "Holland, 1945",
+      "artist": "Neutral Milk Hotel",
+      "album": "In the Aeroplane Over the Sea",
+      "year": 1998,
+      "isrc": null,
+      "durationSec": 192,
+      "audioUrl": null
+    },
+    {
+      "id": "silver-oscillation",
+      "title": "Oscillations",
+      "artist": "Silver Apples",
+      "album": "Silver Apples",
+      "year": 1968,
+      "isrc": null,
+      "durationSec": 176,
+      "audioUrl": null
+    },
+    {
+      "id": "vu-sunday",
+      "title": "Sunday Morning",
+      "artist": "The Velvet Underground",
+      "album": "The Velvet Underground & Nico",
+      "year": 1967,
+      "isrc": null,
+      "durationSec": 174,
+      "audioUrl": null
+    },
+    {
+      "id": "vu-venus",
+      "title": "Venus in Furs",
+      "artist": "The Velvet Underground",
+      "album": "The Velvet Underground & Nico",
+      "year": 1967,
+      "isrc": null,
+      "durationSec": 310,
+      "audioUrl": null
+    },
+    {
+      "id": "stooges-1969",
+      "title": "1969",
+      "artist": "The Stooges",
+      "album": "The Stooges",
+      "year": 1969,
+      "isrc": null,
+      "durationSec": 254,
+      "audioUrl": null
+    },
+    {
+      "id": "stooges-dog",
+      "title": "I Wanna Be Your Dog",
+      "artist": "The Stooges",
+      "album": "The Stooges",
+      "year": 1969,
+      "isrc": null,
+      "durationSec": 189,
+      "audioUrl": null
+    },
+    {
+      "id": "th-psycho",
+      "title": "Psycho Killer",
+      "artist": "Talking Heads",
+      "album": "Talking Heads: 77",
+      "year": 1977,
+      "isrc": null,
+      "durationSec": 261,
+      "audioUrl": null
+    },
+    {
+      "id": "th-uhoh",
+      "title": "Uh-Oh, Love Comes to Town",
+      "artist": "Talking Heads",
+      "album": "Talking Heads: 77",
+      "year": 1977,
+      "isrc": null,
+      "durationSec": 174,
+      "audioUrl": null
+    },
+    {
+      "id": "suicide-ghost",
+      "title": "Ghost Rider",
+      "artist": "Suicide",
+      "album": "Suicide",
+      "year": 1977,
+      "isrc": null,
+      "durationSec": 145,
+      "audioUrl": null
+    },
+    {
+      "id": "gof-natural",
+      "title": "Natural's Not in It",
+      "artist": "Gang of Four",
+      "album": "Entertainment!",
+      "year": 1979,
+      "isrc": null,
+      "durationSec": 195,
+      "audioUrl": null
+    },
+    {
+      "id": "liquid-cavern",
+      "title": "Caverna",
+      "artist": "Liquid Liquid",
+      "album": "Optimo",
+      "year": 1983,
+      "isrc": null,
+      "durationSec": 194,
+      "audioUrl": null
+    },
+    {
+      "id": "thisheat-health",
+      "title": "Health and Efficiency",
+      "artist": "This Heat",
+      "album": "Health and Efficiency",
+      "year": 1980,
+      "isrc": null,
+      "durationSec": 485,
+      "audioUrl": null
+    }
+  ]
+}
