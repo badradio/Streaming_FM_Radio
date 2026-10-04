@@ -42,7 +42,7 @@ Player, now-playing, request desk, and admin desk stay on the page. Signup never
 5. Queue insert **and** AutoDJ pick refuse violations.
 6. Public site: now playing + recently played + “requests play later, not next.” The desk can see up-next and `earliest_play_at`.
 
-Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts)).
+Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts), [`tests/sw.test.ts`](tests/sw.test.ts)).
 
 ## Run locally
 
@@ -89,7 +89,7 @@ The player uses the native `<audio>` element (Icecast MP3/AAC). HLS is not wired
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Astro dev server on port 43123 (file-backed desk state) |
-| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed tests |
+| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed + service worker tests |
 | `npm run d1:create` | `wrangler d1 create badradio-master` — already created; id is in wrangler.jsonc |
 | `npm run d1:migrate` | Apply SQL migrations to the **local** D1 |
 | `npm run d1:migrate:remote` | Apply SQL migrations to production D1 |
@@ -170,7 +170,7 @@ Injects the same iframe. Leave this snippet on **badradio.com** (WordPress / `ba
 
 ## PWA (home screen)
 
-Listen page (`/`): web app manifest name/short_name **badradio**, amber `#e6a23c`, dark `#080705`. Icons 192/512 + maskable from the station radio-wave mark. Service worker `/sw.js` caches the **app shell** (`/`, `/widget`, icons, manifest, `embed.js`) only — never the Live365 stream and never `/api/now-playing`.
+Listen page (`/`): web app manifest name/short_name **badradio**, amber `#e6a23c`, dark `#080705`. Icons 192/512 + maskable from the station radio-wave mark. Service worker `/sw.js` (`badradio-shell-v2`) is **network-first for `/` and `/widget`** so a deploy cannot leave visitors on HTML that points at a deleted hashed stylesheet. Cached HTML is only an offline fallback. Hashed `/_astro/*` files are not intercepted (they go to the network; Cloudflare already marks them immutable). Icons / manifest / `embed.js` stay on the shell cache. `/sw.js` is served `Cache-Control: no-cache`. Never the Live365 stream and never `/api/*`.
 
 Chromium: **Install badradio** when the browser fires `beforeinstallprompt`. iPhone Safari: **Add to Home Screen** hint (Share sheet). Media Session API updates lock screen / car play with artist, title, art, and play/pause.
 

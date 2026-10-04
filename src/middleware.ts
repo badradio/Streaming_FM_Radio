@@ -20,6 +20,16 @@ export const onRequest = defineMiddleware(async ({ request }, next) => {
 
   const response = await next();
 
+  if (pathname === '/sw.js' || pathname === '/sw.js/') {
+    const headers = new Headers(response.headers);
+    headers.set('Cache-Control', 'no-cache');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
   if (isNowPlayingPath(pathname)) return withCors(request, response);
   if (isWidgetPath(pathname)) return withWidgetFraming(response);
   if (isManifestPath(pathname)) {

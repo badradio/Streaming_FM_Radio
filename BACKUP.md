@@ -3,7 +3,7 @@
 This zip is a backup mirror of the **badradio.rocks** Worker (Cloudflare Worker `badradio`).
 
 - **Source of truth:** the Cursor Origin repo. Restore from there when you can.
-- **Commit on `main`:** `e776fef8ff0a44ce685e77b04b70d4814cf3c5fb` (`e776fef`)
+- **Commit on `main`:** `8fb4c783745ab8edcb093dfc277a284aadd62a42` (`8fb4c78`)
 - **No secrets are included.** There is no `.env`, no `.dev.vars`, no `node_modules`, and no API keys. `.gitignore` and `.env.example` are kept on purpose.
 
 ## Deploy from this archive
