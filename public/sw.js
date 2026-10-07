@@ -1,6 +1,6 @@
 /* badradio PWA — app shell only. Never the Live365 stream or /api/*.
    Page navigations are network-first so hashed /_astro CSS/JS cannot go stale. */
-const CACHE = 'badradio-shell-v2';
+const CACHE = 'badradio-shell-v3';
 const SHELL = [
   '/',
   '/widget',

@@ -1,5 +1,5 @@
 /** Must match `public/sw.js`. Bump both when the shell cache strategy changes. */
-export const SHELL_CACHE_NAME = 'badradio-shell-v2';
+export const SHELL_CACHE_NAME = 'badradio-shell-v3';
 
 export const SHELL_PATHS = [
   '/',

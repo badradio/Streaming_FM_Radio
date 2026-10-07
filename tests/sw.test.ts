@@ -14,10 +14,11 @@ const swSource = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8
 describe('service worker policy', () => {
   const origin = 'https://badradio.rocks';
 
-  it('uses the v2 cache name and matches public/sw.js', () => {
-    expect(SHELL_CACHE_NAME).toBe('badradio-shell-v2');
+  it('uses the v3 cache name and matches public/sw.js', () => {
+    expect(SHELL_CACHE_NAME).toBe('badradio-shell-v3');
     expect(swSource).toContain(`const CACHE = '${SHELL_CACHE_NAME}'`);
     expect(swSource).not.toContain('badradio-shell-v1');
+    expect(swSource).not.toContain('badradio-shell-v2');
     expect(swSource).toContain('skipWaiting');
     expect(swSource).toContain('clients.claim');
     expect(swSource).toMatch(/keys\.filter\(\(key\) => key !== CACHE\)/);

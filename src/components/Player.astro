@@ -12,7 +12,6 @@ const compact = size === 'compact';
 <div
   class:list={['player shrink-0', compact && 'player-compact']}
   data-player
-  data-stream-url={streamUrl}
   data-connected={connected ? 'true' : 'false'}
   data-player-size={size}
 >
@@ -78,9 +77,56 @@ const compact = size === 'compact';
       )
     }
   </p>
+
+  {
+    connected ? (
+      <div
+        data-stream-picker
+        role="radiogroup"
+        aria-label="stream"
+        class:list={['flex flex-wrap', compact ? 'mt-2 gap-1' : 'mt-3 gap-1.5']}
+      >
+        <button
+          type="button"
+          data-stream="aac"
+          role="radio"
+          aria-checked="true"
+          class:list={[
+            'border border-amber px-2 font-mono tracking-[0.08em] text-amber hover:bg-amber hover:text-void focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber',
+            compact ? 'py-0.5 text-[0.55rem]' : 'py-1 text-[0.65rem]',
+          ]}
+        >
+          aac 96k
+        </button>
+        <button
+          type="button"
+          data-stream="mp3"
+          role="radio"
+          aria-checked="false"
+          class:list={[
+            'border border-line px-2 font-mono tracking-[0.08em] text-muted hover:border-amber hover:text-amber focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber',
+            compact ? 'py-0.5 text-[0.55rem]' : 'py-1 text-[0.65rem]',
+          ]}
+        >
+          mp3 192k
+        </button>
+      </div>
+    ) : null
+  }
 </div>
 
 <script>
+  import {
+    STREAMS,
+    StreamWatchdog,
+    canPlayAac,
+    readStoredStream,
+    resolveStreamId,
+    writeStoredStream,
+    type PlayerStatus,
+    type StreamId,
+  } from '../lib/player-stream';
+
   type NowDetail = { artist?: string; title?: string; art?: string };
 
   function initPlayer(root: HTMLElement) {
@@ -91,20 +137,37 @@ const compact = size === 'compact';
     const pauseIcon = root.querySelector<SVGElement>('[data-icon-pause]');
     if (!audio || !button || !status || !playIcon || !pauseIcon) return;
 
-    const streamUrl = root.dataset.streamUrl?.trim() ?? '';
-    const connected = root.dataset.connected === 'true' && streamUrl.length > 0;
+    const connected = root.dataset.connected === 'true';
     let now: NowDetail = {};
+    let streamId: StreamId = 'aac';
 
-    const setStatus = (text: string, live: boolean) => {
+    const setStatus = (kind: PlayerStatus | 'ready' | 'dead') => {
+      const text =
+        kind === 'onair'
+          ? 'On air'
+          : kind === 'paused'
+            ? 'Paused'
+            : kind === 'reconnecting'
+              ? 'Reconnecting…'
+              : kind === 'connecting'
+                ? 'Connecting to origin…'
+                : kind === 'dead'
+                  ? 'Stream not connected'
+                  : 'Ready — hit play';
       status.textContent = text;
-      status.classList.toggle('text-signal', live);
-      status.classList.toggle('pulse-live', live);
-      status.classList.toggle('text-filament', text.toLowerCase().includes("can't"));
-      status.classList.toggle('text-muted', !live && !text.toLowerCase().includes("can't"));
+      status.classList.toggle('text-signal', kind === 'onair');
+      status.classList.toggle('pulse-live', kind === 'onair');
+      status.classList.toggle('text-amber', kind === 'reconnecting');
+      status.classList.toggle('uppercase', kind !== 'reconnecting');
+      status.classList.toggle('normal-case', kind === 'reconnecting');
+      status.classList.toggle('text-muted', kind !== 'onair' && kind !== 'reconnecting');
     };
 
     const artworkFor = (art?: string) => {
-      const fallback = [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }];
+      const fallback = [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+      ];
       if (art && /^https?:/i.test(art)) {
         return [{ src: art, sizes: '512x512', type: 'image/jpeg' }, ...fallback];
       }
@@ -128,12 +191,12 @@ const compact = size === 'compact';
       }
     };
 
-    const setPlaying = (playing: boolean) => {
-      button.setAttribute('aria-pressed', String(playing));
-      button.setAttribute('aria-label', playing ? 'Pause live stream' : 'Play live stream');
-      playIcon.classList.toggle('hidden', playing);
-      pauseIcon.classList.toggle('hidden', !playing);
-      syncMediaSession(playing);
+    const setWanted = (want: boolean) => {
+      button.setAttribute('aria-pressed', String(want));
+      button.setAttribute('aria-label', want ? 'Pause live stream' : 'Play live stream');
+      playIcon.classList.toggle('hidden', want);
+      pauseIcon.classList.toggle('hidden', !want);
+      syncMediaSession(want);
     };
 
     if (!connected) {
@@ -143,63 +206,69 @@ const compact = size === 'compact';
       return;
     }
 
-    audio.src = streamUrl;
+    const aacOk = canPlayAac(audio);
+    streamId = resolveStreamId(readStoredStream(localStorage), aacOk);
+    if (!aacOk) {
+      const aacButton = root.querySelector<HTMLButtonElement>('[data-stream="aac"]');
+      if (aacButton) aacButton.disabled = true;
+    }
 
-    const play = async () => {
-      setStatus('Connecting to origin…', false);
-      try {
-        await audio.play();
-      } catch {
-        setPlaying(false);
-        setStatus("Can't reach origin", false);
-      }
+    const paintPicker = () => {
+      root.querySelectorAll<HTMLButtonElement>('[data-stream]').forEach((el) => {
+        const selected = el.dataset.stream === streamId;
+        el.setAttribute('aria-checked', String(selected));
+        el.classList.toggle('border-amber', selected);
+        el.classList.toggle('text-amber', selected);
+        el.classList.toggle('border-line', !selected);
+        el.classList.toggle('text-muted', !selected);
+      });
     };
 
+    const watchdog = new StreamWatchdog(audio, {
+      getUrl: () => STREAMS[streamId].url,
+      onStatus: (kind) => setStatus(kind),
+      onWant: (want) => setWanted(want),
+    });
+    watchdog.bind();
+    paintPicker();
+
     button.addEventListener('click', () => {
-      if (audio.paused) {
-        window.__badradioTrack?.('play_click');
-        void play();
-      } else {
-        audio.pause();
+      if (watchdog.want) {
+        watchdog.pause();
+        return;
       }
+      window.__badradioTrack?.('play_click');
+      watchdog.start();
     });
 
-    audio.addEventListener('playing', () => {
-      setPlaying(true);
-      setStatus('On air', true);
-    });
-
-    audio.addEventListener('pause', () => {
-      setPlaying(false);
-      setStatus('Paused', false);
-    });
-
-    audio.addEventListener('waiting', () => {
-      setStatus('Connecting to origin…', false);
-    });
-
-    audio.addEventListener('error', () => {
-      setPlaying(false);
-      setStatus("Can't reach origin", false);
+    root.querySelectorAll<HTMLButtonElement>('[data-stream]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const next = el.dataset.stream === 'mp3' ? 'mp3' : 'aac';
+        if (next === 'aac' && !canPlayAac(audio)) return;
+        streamId = next;
+        writeStoredStream(localStorage, streamId);
+        paintPicker();
+        if (watchdog.want) watchdog.start();
+      });
     });
 
     window.addEventListener('badradio:now', ((event: Event) => {
       const detail = (event as CustomEvent<NowDetail>).detail;
       if (!detail || typeof detail !== 'object') return;
       now = detail;
-      syncMediaSession(audio.paused ? false : true);
+      syncMediaSession(watchdog.want);
     }) as EventListener);
 
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.setActionHandler('play', () => {
-          void play();
+          watchdog.start();
         });
         navigator.mediaSession.setActionHandler('pause', () => {
-          audio.pause();
+          watchdog.pause();
         });
         navigator.mediaSession.setActionHandler('stop', () => {
-          audio.pause();
+          watchdog.pause();
         });
       } catch {
         /* some browsers reject handlers */

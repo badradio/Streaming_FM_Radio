@@ -42,7 +42,7 @@ Player, now-playing, request desk, and admin desk stay on the page. Signup never
 5. Queue insert **and** AutoDJ pick refuse violations.
 6. Public site: now playing + recently played + “requests play later, not next.” The desk can see up-next and `earliest_play_at`.
 
-Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts), [`tests/sw.test.ts`](tests/sw.test.ts)).
+Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts), [`tests/sw.test.ts`](tests/sw.test.ts), [`tests/player-stream.test.ts`](tests/player-stream.test.ts)).
 
 ## Run locally
 
@@ -75,7 +75,7 @@ The player uses the native `<audio>` element (Icecast MP3/AAC). HLS is not wired
 
 | Variable | Where it is read | Notes |
 | --- | --- | --- |
-| `PUBLIC_STREAM_URL` | Worker runtime env first, then `import.meta.env` | Public Live365 mount. Set as a Worker **plaintext** variable in the dashboard (not a secret). The listen page reads it per request so a new deploy does not bake an empty URL. Passed to the browser `<audio>` element — the Worker does not proxy the stream. Station id for now-playing is derived from `https://streaming.live365.com/<id>`. |
+| `PUBLIC_STREAM_URL` | Worker runtime env first, then `import.meta.env` | Public Live365 mount. Set as a Worker **plaintext** variable in the dashboard (not a secret). Gates the play button (empty = disconnected). The player itself picks **AAC 96k** (`a58480_2`) or **MP3 192k** (`a58480`) in the browser — the Worker does not proxy the stream. Station id for now-playing is derived from `https://streaming.live365.com/<id>`. |
 | `LIVE365_STATION_ID` | Worker runtime env (optional) | Override if the mount URL is not a standard Live365 streaming URL. |
 | `ADMIN_PASSWORD` | Server only | Shared desk password. Set in `.env` / `.dev.vars` locally. Production: `wrangler secret put ADMIN_PASSWORD`. Never commit it. |
 | `PUBLIC_CF_BEACON_TOKEN` | Worker runtime env first (`env.PUBLIC_CF_BEACON_TOKEN`), then `import.meta.env` | **Token-only hex** from the zone Web Analytics snippet (`data-cf-beacon`). Set as a Worker **plaintext** variable on Worker **`badradio`** (not mark-fyi). If the whole `<script>` blob is pasted, runtime extracts the hex. Leave empty to skip the beacon. Never commit it. `npm run deploy` uses `--keep-vars`. |
@@ -89,7 +89,7 @@ The player uses the native `<audio>` element (Icecast MP3/AAC). HLS is not wired
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Astro dev server on port 43123 (file-backed desk state) |
-| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed + service worker tests |
+| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed + service worker + player reconnect tests |
 | `npm run d1:create` | `wrangler d1 create badradio-master` — already created; id is in wrangler.jsonc |
 | `npm run d1:migrate` | Apply SQL migrations to the **local** D1 |
 | `npm run d1:migrate:remote` | Apply SQL migrations to production D1 |
@@ -170,7 +170,9 @@ Injects the same iframe. Leave this snippet on **badradio.com** (WordPress / `ba
 
 ## PWA (home screen)
 
-Listen page (`/`): web app manifest name/short_name **badradio**, amber `#e6a23c`, dark `#080705`. Icons 192/512 + maskable from the station radio-wave mark. Service worker `/sw.js` (`badradio-shell-v2`) is **network-first for `/` and `/widget`** so a deploy cannot leave visitors on HTML that points at a deleted hashed stylesheet. Cached HTML is only an offline fallback. Hashed `/_astro/*` files are not intercepted (they go to the network; Cloudflare already marks them immutable). Icons / manifest / `embed.js` stay on the shell cache. `/sw.js` is served `Cache-Control: no-cache`. Never the Live365 stream and never `/api/*`.
+Listen page (`/`): web app manifest name/short_name **badradio**, amber `#e6a23c`, dark `#080705`. Icons 192/512 + maskable from the station radio-wave mark. Service worker `/sw.js` (`badradio-shell-v3`) is **network-first for `/` and `/widget`** so a deploy cannot leave visitors on HTML that points at a deleted hashed stylesheet. Cached HTML is only an offline fallback. Hashed `/_astro/*` files are not intercepted (they go to the network; Cloudflare already marks them immutable). Icons / manifest / `embed.js` stay on the shell cache. `/sw.js` is served `Cache-Control: no-cache`. Never the Live365 stream and never `/api/*`.
+
+The listen and widget players share [`src/lib/player-stream.ts`](src/lib/player-stream.ts): AAC 96k by default (MP3 192k as the other choice, remembered in `localStorage` `br_stream`), `preload=none`, no `src` until play, cache-busted reconnects, backoff 1–30s, stall watchdog (8s frozen `currentTime`). Status while retrying is **Reconnecting…** — not a dead-end error. The Worker still does not proxy audio.
 
 Chromium: **Install badradio** when the browser fires `beforeinstallprompt`. iPhone Safari: **Add to Home Screen** hint (Share sheet). Media Session API updates lock screen / car play with artist, title, art, and play/pause.
 
