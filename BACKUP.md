@@ -1,26 +1,11 @@
-# badradio.rocks backup
+This is a backup mirror of the badradio.rocks Worker.
 
-This zip is a backup mirror of the **badradio.rocks** Worker (Cloudflare Worker `badradio`).
+Source of truth is the Cursor Origin repo. No secrets are included.
 
-- **Source of truth:** the Cursor Origin repo. Restore from there when you can.
-- **Commit on `main`:** `4520623c0d1e027da07444454c429161b4d54156` (`4520623`)
-- **No secrets are included.** There is no `.env`, no `.dev.vars`, no `node_modules`, and no API keys. `.gitignore` and `.env.example` are kept on purpose.
+Commit of main: 96d78702f8c2fabdb7f1ec991f4a1dd2c268cab9
 
-## Deploy from this archive
-
-1. `npm ci`
-2. Apply the SQL in the `migrations/` folder to the D1 database (`badradio-master` / binding `MASTER`).
-3. Set secrets (values are not in this zip):
-
-   ```sh
-   npx wrangler secret put RESEND_API_KEY
-   npx wrangler secret put ADMIN_PASSWORD
-   ```
-
-4. Deploy without wiping dashboard plaintext vars:
-
-   ```sh
-   npx wrangler deploy --keep-vars
-   ```
-
-Or `npm run deploy` in this tree (it already uses `--keep-vars`).
+Deploy steps:
+1. npm ci
+2. Apply the migrations folder to the D1 database (badradio-master / MASTER).
+3. Set the RESEND_API_KEY and ADMIN_PASSWORD secrets with wrangler secret put.
+4. wrangler deploy --keep-vars

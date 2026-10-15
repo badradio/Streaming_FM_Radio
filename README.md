@@ -42,7 +42,7 @@ Player, now-playing, request desk, and admin desk stay on the page. Signup never
 5. Queue insert **and** AutoDJ pick refuse violations.
 6. Public site: now playing + recently played + “requests play later, not next.” The desk can see up-next and `earliest_play_at`.
 
-Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts), [`tests/sw.test.ts`](tests/sw.test.ts), [`tests/player-stream.test.ts`](tests/player-stream.test.ts)).
+Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts), [`tests/sw.test.ts`](tests/sw.test.ts), [`tests/player-stream.test.ts`](tests/player-stream.test.ts), [`tests/plays.test.ts`](tests/plays.test.ts)).
 
 ## Run locally
 
@@ -89,7 +89,7 @@ The player uses the native `<audio>` element (Icecast MP3/AAC). HLS is not wired
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Astro dev server on port 43123 (file-backed desk state) |
-| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed + service worker + player reconnect tests |
+| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed + service worker + player reconnect + play-log tests |
 | `npm run d1:create` | `wrangler d1 create badradio-master` — already created; id is in wrangler.jsonc |
 | `npm run d1:migrate` | Apply SQL migrations to the **local** D1 |
 | `npm run d1:migrate:remote` | Apply SQL migrations to production D1 |
@@ -189,6 +189,12 @@ Live365 AutoDJ is **manual**. This desk tracks legality and requests. There is *
 We **do** read the public station JSON (`GET https://api.live365.com/station/<id>`) for listener now-playing: `current-track` and `last-played`. The Worker proxies that on `GET /api/now-playing` (and on listen / admin loads). When that metadata matches a queued request (folded artist/title), the desk marks it played. That is bookkeeping, not a playlist push.
 
 The same fetch **upserts an air log** in station KV: unique folded artist/title, first/last seen, play count (idempotent inside a 12-minute window so 18s polls and lingering last-played do not explode counts). Cap: **4000** unique keys; oldest `lastSeenAt` is dropped. Live365 has no library export and `/library` is not a public API — this harvest is **not** a full Live365 library. Diff it against the Dropbox master in D1.
+
+### Play log (D1 `plays`)
+
+A Worker **cron every minute** polls `https://api.live365.com/station/a58480` and `INSERT OR IGNORE`s `current-track` plus every `last-played` row into D1 table **`plays`** (migration [`0004_plays.sql`](migrations/0004_plays.sql)). Unique on `(artist, title, started_at)`. `started_at` is UTC ISO; `started_ct` is America/Chicago local. Live365 has no album — that column stays null. `is_cue` is 1 for j-number artists (`j12`), patreon, station IDs (`id` / `07-panther`), empty artist, artist `Live365`, and titles that contain `Ad Break`. Each poll also `UPDATE`s already-logged ad-break rows to `is_cue = 1`.
+
+Read-only: `GET /api/plays?since=&until=&artist=&limit=50&include_cues=false` → `{ ok, count, plays }` newest first. Default hides cues. Limit max 500. Does not change `/api/now-playing`.
 
 ## Dropbox master library (D1)
 
