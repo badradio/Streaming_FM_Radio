@@ -1,6 +1,7 @@
 ---
 import type { Live365Result } from '../lib/live365/normalize';
 import Panther from './Panther.astro';
+import PantherWalk from './PantherWalk.astro';
 
 interface Props {
   initial: Live365Result;
@@ -14,7 +15,7 @@ const badge = live ? 'On air — Live365' : initial.ok ? 'Live365 — nothing li
 const seed = JSON.stringify(initial).replace(/</g, '\\u003c');
 ---
 
-<div data-on-air class="space-y-8">
+<div data-on-air class="space-y-8 overflow-x-hidden">
   <script type="application/json" data-on-air-seed set:html={seed}></script>
 
   <div class="flex flex-col gap-10 sm:flex-row sm:items-end">
@@ -58,6 +59,8 @@ const seed = JSON.stringify(initial).replace(/</g, '\\u003c');
       </div>
     </section>
   </div>
+
+  <PantherWalk />
 
   <section aria-labelledby="recent-heading" class="relative border border-line bg-panel px-4 py-4">
     <div class="pointer-events-none absolute -top-5 right-8 z-10" aria-hidden="true">

@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Player from '../components/Player.astro';
+import PantherWalk from '../components/PantherWalk.astro';
 import { getPublicStreamUrl } from '../lib/runtime';
 import { reconcileDeskWithAir } from '../lib/radio/reconcile';
 import { relativeTime } from '../lib/relative-time';
@@ -28,7 +29,7 @@ function artUrl(track: OnAirTrack | null): string | undefined {
 >
   <div
     data-widget
-    class="widget-shell mx-auto w-full max-w-none bg-void px-3 py-3 sm:px-4"
+    class="widget-shell mx-auto w-full max-w-none overflow-x-hidden bg-void px-3 py-3 sm:px-4"
   >
     <script type="application/json" data-widget-seed set:html={seed}></script>
 
@@ -43,7 +44,7 @@ function artUrl(track: OnAirTrack | null): string | undefined {
       <p class="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-dim">Underground FM</p>
     </header>
 
-    <div class="widget-body mt-3 grid gap-4 min-[640px]:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] min-[640px]:items-start">
+    <div class="widget-body mt-3 flex flex-col gap-3">
       <section class="flex min-w-0 items-center gap-3">
         <Player streamUrl={streamUrl} size="compact" />
         <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -84,6 +85,8 @@ function artUrl(track: OnAirTrack | null): string | undefined {
           </div>
         </div>
       </section>
+
+      <PantherWalk compact />
 
       <section aria-labelledby="widget-recent-heading" class="min-w-0 border border-line bg-panel px-3 py-2">
         <h2 id="widget-recent-heading" class="font-mono text-[0.6rem] uppercase tracking-[0.16em] text-muted">

@@ -366,8 +366,9 @@ Official mascot is Mark’s black cat **Panther**. Silhouettes only — not hero
 | Lounge | `panther-lounge.svg` | Footer ledge; About; empty recently-played |
 | Peek | `panther-peek.svg` | Top edge of recently played |
 | Loaf | `panther-loaf.svg` | Outpost signup corner; 404 |
+| Walk | `panther_walk_sheet.png` (+ `@2x`) | Band between now playing and recently played (listen + widget) |
 
-CSS: ~64–128px, opacity ~0.45 (dark) / ~0.28 (light), `pointer-events: none`. Eyes stay on. Fill is charcoal `#2c2c32` with amber stroke `#e8b030`. Alt text (also in the SVG `<title>`):
+CSS: ~64–128px, opacity ~0.45 (dark) / ~0.28 (light), `pointer-events: none`. Eyes stay on. Fill is charcoal `#2c2c32` with amber stroke `#e8b030`. The walk cycle is a 12-frame sheet (106×80, `@2x` 211×160, 83 ms/frame) in [`public/panther/`](public/panther/). Legs use `steps(12)`; he trots left to right across the clipped strip, waits 3 seconds, and repeats. `prefers-reduced-motion` keeps one still frame at the left. `aria-hidden` and `pointer-events: none`. Alt text (also in the SVG `<title>`):
 
 - Lounge: Panther, the station’s black cat, lounging along the ledge
 - Peek: Panther peeking over the ledge

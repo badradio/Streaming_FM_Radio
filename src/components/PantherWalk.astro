@@ -1,0 +1,15 @@
+---
+interface Props {
+  compact?: boolean;
+}
+
+const { compact = false } = Astro.props;
+---
+
+<div
+  class:list={['panther-strip', compact && 'panther-strip-compact']}
+  data-panther-walk
+  aria-hidden="true"
+>
+  <div class="panther-walk"></div>
+</div>

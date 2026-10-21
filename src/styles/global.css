@@ -150,3 +150,78 @@ body {
     opacity: 0.28;
   }
 }
+
+/* Walking Panther: 12-frame sheet (106x80, @2x 211x160), 83ms/frame. */
+.panther-strip {
+  --panther-frame-w: 85px;
+  --panther-frame-h: 64px;
+  --panther-sheet-w: 1020px;
+  --panther-sheet-h: 64px;
+  position: relative;
+  height: var(--panther-frame-h);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.panther-strip-compact {
+  --panther-frame-w: 64px;
+  --panther-frame-h: 48px;
+  --panther-sheet-w: 768px;
+  --panther-sheet-h: 48px;
+}
+
+.panther-walk {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--panther-frame-w) * -1);
+  width: var(--panther-frame-w);
+  height: var(--panther-frame-h);
+  pointer-events: none;
+  background-image: url('../assets/panther/panther_walk_sheet.png');
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-size: var(--panther-sheet-w) var(--panther-sheet-h);
+  opacity: 0.62;
+  animation:
+    panther-steps 0.996s steps(12) infinite,
+    panther-cross 21s linear infinite;
+}
+
+@media (min-resolution: 2dppx) {
+  .panther-walk {
+    background-image: url('../assets/panther/panther_walk_sheet_2x.png');
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .panther-walk {
+    opacity: 0.38;
+  }
+}
+
+@keyframes panther-steps {
+  to {
+    background-position-x: calc(var(--panther-sheet-w) * -1);
+  }
+}
+
+/* Slow trot: enter off the left, exit off the right, sit 3s, repeat. */
+@keyframes panther-cross {
+  0% {
+    left: calc(var(--panther-frame-w) * -1);
+  }
+  86% {
+    left: 100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panther-walk {
+    animation: none;
+    left: 0.75rem;
+    background-position: 0 0;
+  }
+}

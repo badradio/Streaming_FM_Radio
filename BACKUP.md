@@ -2,7 +2,7 @@ This is a backup mirror of the badradio.rocks Worker.
 
 Source of truth is the Cursor Origin repo. No secrets are included.
 
-Commit of main: 96d78702f8c2fabdb7f1ec991f4a1dd2c268cab9
+Commit of main: 4ba6f86258d1976ffc231abb2be8567a69357b29
 
 Deploy steps:
 1. npm ci
