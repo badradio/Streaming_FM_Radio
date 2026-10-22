@@ -16,6 +16,7 @@ export type WorkerEnv = {
   RESEND_API_KEY?: string;
   NOTIFY_TO?: string;
   NOTIFY_FROM?: string;
+  FEEDBACK_ADMIN_KEY?: string;
 };
 
 /** Astro 7 / Cloudflare: use importable env, not locals.runtime.env. */

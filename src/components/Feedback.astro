@@ -1,0 +1,275 @@
+---
+interface Props {
+  compact?: boolean;
+}
+
+const { compact = false } = Astro.props;
+---
+
+<section
+  data-feedback
+  hidden
+  class:list={[
+    'relative border border-line bg-panel',
+    compact ? 'px-3 py-2' : 'mt-6 px-4 py-4',
+  ]}
+  aria-label="Listener feedback preview"
+>
+  <p class:list={['font-mono uppercase tracking-[0.16em] text-muted', compact ? 'text-[0.6rem]' : 'text-[0.65rem]']}>
+    How’s this track?
+  </p>
+  <div class:list={['flex flex-wrap items-center', compact ? 'mt-1.5 gap-1.5' : 'mt-3 gap-2']}>
+    <button
+      type="button"
+      data-feedback-up
+      aria-pressed="false"
+      class:list={[
+        'border border-line px-3 font-mono uppercase tracking-[0.1em] text-ink hover:border-amber hover:text-amber focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber',
+        compact ? 'py-1 text-[0.6rem]' : 'py-1.5 text-xs',
+      ]}
+    >
+      Thumbs up
+    </button>
+    <button
+      type="button"
+      data-feedback-down
+      aria-pressed="false"
+      class:list={[
+        'border border-line px-3 font-mono uppercase tracking-[0.1em] text-ink hover:border-amber hover:text-amber focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber',
+        compact ? 'py-1 text-[0.6rem]' : 'py-1.5 text-xs',
+      ]}
+    >
+      Thumbs down
+    </button>
+  </div>
+  <p
+    data-feedback-vote-status
+    class:list={['font-serif text-ink/80', compact ? 'mt-1.5 text-sm' : 'mt-2 text-base']}
+    role="status"
+    aria-live="polite"
+  >
+  </p>
+
+  <form data-feedback-form class:list={['border-t border-line', compact ? 'mt-2 pt-2' : 'mt-4 pt-4']}>
+    <p class:list={['font-mono uppercase tracking-[0.16em] text-muted', compact ? 'text-[0.6rem]' : 'text-[0.65rem]']}>
+      Optional note
+    </p>
+    <label class="sr-only" for={compact ? 'feedback-website-w' : 'feedback-website'}>Company website</label>
+    <input
+      id={compact ? 'feedback-website-w' : 'feedback-website'}
+      name="website"
+      type="text"
+      tabindex="-1"
+      autocomplete="off"
+      class="absolute -left-[9999px] h-px w-px overflow-hidden opacity-0"
+    />
+    <div class:list={['flex flex-col', compact ? 'mt-1.5 gap-1.5' : 'mt-3 gap-2']}>
+      <label class="min-w-0">
+        <span class="sr-only">Kind</span>
+        <select
+          name="kind"
+          class:list={[
+            'w-full border border-line bg-void px-2 font-mono text-ink outline-none focus:border-amber',
+            compact ? 'py-1 text-[0.65rem]' : 'py-2 text-sm',
+          ]}
+        >
+          <option value="where_i_am">Where I am</option>
+          <option value="request">Request</option>
+          <option value="dedication">Dedication</option>
+        </select>
+      </label>
+      <label class="min-w-0">
+        <span class="sr-only">Note</span>
+        <textarea
+          name="body"
+          maxlength="200"
+          rows={compact ? 2 : 3}
+          placeholder="City, a dedication, or a later request — 200 characters."
+          class:list={[
+            'w-full resize-y border border-line bg-void px-2 font-serif text-ink outline-none focus:border-amber',
+            compact ? 'py-1 text-sm' : 'py-2 text-base',
+          ]}
+        ></textarea>
+      </label>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p data-feedback-count class="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-dim">200 left</p>
+        <button
+          type="submit"
+          class:list={[
+            'border border-amber px-3 font-mono uppercase tracking-[0.12em] text-amber hover:bg-amber hover:text-void focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber',
+            compact ? 'py-1 text-[0.6rem]' : 'py-1.5 text-xs',
+          ]}
+        >
+          Send note
+        </button>
+      </div>
+    </div>
+    <p
+      data-feedback-note-status
+      class:list={['font-serif text-ink/80', compact ? 'mt-1.5 text-sm' : 'mt-2 text-base']}
+      role="status"
+      aria-live="polite"
+    >
+    </p>
+  </form>
+</section>
+
+<script>
+  import {
+    FEEDBACK_MESSAGE_MAX,
+    FEEDBACK_PREVIEW_STORAGE,
+    FEEDBACK_SESSION_STORAGE,
+    newFeedbackSessionId,
+    parsePreviewChoice,
+  } from '../lib/feedback';
+
+  type Vote = 1 | -1;
+
+  function sessionId(): string {
+    try {
+      const existing = localStorage.getItem(FEEDBACK_SESSION_STORAGE)?.trim() ?? '';
+      if (/^[A-Za-z0-9_-]{16,64}$/.test(existing)) return existing;
+      const next = newFeedbackSessionId();
+      localStorage.setItem(FEEDBACK_SESSION_STORAGE, next);
+      return next;
+    } catch {
+      return newFeedbackSessionId();
+    }
+  }
+
+  function previewOn(): boolean {
+    const search = new URL(window.location.href).searchParams;
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(FEEDBACK_PREVIEW_STORAGE);
+    } catch {
+      stored = null;
+    }
+    const on = parsePreviewChoice(search, stored);
+    try {
+      if (search.get('preview')?.trim().toLowerCase() === 'feedback') {
+        localStorage.setItem(FEEDBACK_PREVIEW_STORAGE, 'feedback');
+      } else if (['off', '0', 'none'].includes((search.get('preview') ?? '').trim().toLowerCase())) {
+        localStorage.removeItem(FEEDBACK_PREVIEW_STORAGE);
+      }
+    } catch {
+      /* private mode */
+    }
+    return on;
+  }
+
+  function paintVote(root: HTMLElement, vote: Vote | null) {
+    const up = root.querySelector<HTMLButtonElement>('[data-feedback-up]');
+    const down = root.querySelector<HTMLButtonElement>('[data-feedback-down]');
+    if (!up || !down) return;
+    up.setAttribute('aria-pressed', String(vote === 1));
+    down.setAttribute('aria-pressed', String(vote === -1));
+    up.classList.toggle('border-amber', vote === 1);
+    up.classList.toggle('text-amber', vote === 1);
+    down.classList.toggle('border-amber', vote === -1);
+    down.classList.toggle('text-amber', vote === -1);
+  }
+
+  function setStatus(el: HTMLElement | null, text: string, kind: 'ok' | 'err' | '') {
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('text-filament', kind === 'err');
+    el.classList.toggle('text-signal', kind === 'ok');
+    el.classList.toggle('text-ink/80', kind === '');
+  }
+
+  function init(root: HTMLElement) {
+    if (!previewOn()) return;
+    root.hidden = false;
+
+    const sid = sessionId();
+    const voteStatus = root.querySelector<HTMLElement>('[data-feedback-vote-status]');
+    const noteStatus = root.querySelector<HTMLElement>('[data-feedback-note-status]');
+    const form = root.querySelector<HTMLFormElement>('[data-feedback-form]');
+    const body = root.querySelector<HTMLTextAreaElement>('textarea[name="body"]');
+    const count = root.querySelector<HTMLElement>('[data-feedback-count]');
+
+    const refreshCount = () => {
+      if (!count || !body) return;
+      const left = Math.max(0, FEEDBACK_MESSAGE_MAX - body.value.length);
+      count.textContent = `${left} left`;
+    };
+    body?.addEventListener('input', refreshCount);
+    refreshCount();
+
+    const loadMine = async () => {
+      try {
+        const response = await fetch(`/api/feedback/vote?session_id=${encodeURIComponent(sid)}`, {
+          headers: { Accept: 'application/json' },
+        });
+        const data = (await response.json()) as { ok?: boolean; vote?: Vote | null };
+        if (data.ok) paintVote(root, data.vote ?? null);
+      } catch {
+        /* stay empty */
+      }
+    };
+
+    const sendVote = async (vote: Vote) => {
+      setStatus(voteStatus, 'Saving…', '');
+      try {
+        const response = await fetch('/api/feedback/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            session_id: sid,
+            vote,
+            website: (form?.elements.namedItem('website') as HTMLInputElement | null)?.value ?? '',
+          }),
+        });
+        const data = (await response.json()) as { ok?: boolean; vote?: Vote; error?: string };
+        if (!data.ok) {
+          setStatus(voteStatus, data.error || 'Could not save that vote.', 'err');
+          return;
+        }
+        paintVote(root, data.vote ?? vote);
+        setStatus(voteStatus, vote === 1 ? 'Got it — thumbs up.' : 'Got it — thumbs down.', 'ok');
+      } catch {
+        setStatus(voteStatus, 'Could not reach the desk. Play still works.', 'err');
+      }
+    };
+
+    root.querySelector('[data-feedback-up]')?.addEventListener('click', () => {
+      void sendVote(1);
+    });
+    root.querySelector('[data-feedback-down]')?.addEventListener('click', () => {
+      void sendVote(-1);
+    });
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form || !body) return;
+      setStatus(noteStatus, 'Sending…', '');
+      try {
+        const response = await fetch('/api/feedback/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            session_id: sid,
+            kind: (form.elements.namedItem('kind') as HTMLSelectElement | null)?.value,
+            body: body.value,
+            website: (form.elements.namedItem('website') as HTMLInputElement | null)?.value ?? '',
+          }),
+        });
+        const data = (await response.json()) as { ok?: boolean; error?: string };
+        if (!data.ok) {
+          setStatus(noteStatus, data.error || 'Could not send that note.', 'err');
+          return;
+        }
+        body.value = '';
+        refreshCount();
+        setStatus(noteStatus, 'Thanks — Mark will see that.', 'ok');
+      } catch {
+        setStatus(noteStatus, 'Could not reach the desk. Play still works.', 'err');
+      }
+    });
+
+    void loadMine();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-feedback]').forEach(init);
+</script>

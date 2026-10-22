@@ -23,6 +23,15 @@ export function isNowPlayingPath(pathname: string): boolean {
   return pathname === '/api/now-playing' || pathname === '/api/now-playing/';
 }
 
+export function isFeedbackWritePath(pathname: string): boolean {
+  return (
+    pathname === '/api/feedback/vote' ||
+    pathname === '/api/feedback/vote/' ||
+    pathname === '/api/feedback/message' ||
+    pathname === '/api/feedback/message/'
+  );
+}
+
 export function isWidgetPath(pathname: string): boolean {
   return pathname === '/widget' || pathname === '/widget/';
 }
@@ -31,20 +40,20 @@ export function isManifestPath(pathname: string): boolean {
   return pathname === '/manifest.webmanifest' || pathname === '/manifest.webmanifest/';
 }
 
-export function corsHeadersForOrigin(origin: EmbedOrigin): Headers {
+export function corsHeadersForOrigin(origin: EmbedOrigin, methods = 'GET, OPTIONS'): Headers {
   const headers = new Headers();
   headers.set('Access-Control-Allow-Origin', origin);
-  headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  headers.set('Access-Control-Allow-Methods', methods);
   headers.set('Access-Control-Allow-Headers', 'Accept, Content-Type');
   headers.set('Access-Control-Max-Age', '86400');
   headers.set('Vary', 'Origin');
   return headers;
 }
 
-export function corsHeadersForRequest(request: Request): Headers | undefined {
+export function corsHeadersForRequest(request: Request, methods = 'GET, OPTIONS'): Headers | undefined {
   const origin = embedOriginFromHeader(request.headers.get('Origin'));
   if (!origin) return undefined;
-  return corsHeadersForOrigin(origin);
+  return corsHeadersForOrigin(origin, methods);
 }
 
 export function applyHeaders(response: Response, extra: Headers): Response {
@@ -90,8 +99,8 @@ export function withWidgetFraming(response: Response): Response {
   });
 }
 
-export function corsPreflight(request: Request): Response {
-  const cors = corsHeadersForRequest(request);
+export function corsPreflight(request: Request, methods = 'GET, OPTIONS'): Response {
+  const cors = corsHeadersForRequest(request, methods);
   if (!cors) return new Response(null, { status: 403 });
   return new Response(null, { status: 204, headers: cors });
 }

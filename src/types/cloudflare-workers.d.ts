@@ -11,5 +11,6 @@ declare module 'cloudflare:workers' {
     RESEND_API_KEY?: string;
     NOTIFY_TO?: string;
     NOTIFY_FROM?: string;
+    FEEDBACK_ADMIN_KEY?: string;
   };
 }

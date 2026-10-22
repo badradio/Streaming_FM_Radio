@@ -7,7 +7,7 @@ declare module '*.svg?raw' {
 
 interface KVNamespace {
   get(key: string, type: 'json'): Promise<unknown>;
-  put(key: string, value: string): Promise<void>;
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
 }
 
 interface ImportMetaEnv {
@@ -43,6 +43,7 @@ type RuntimeEnv = {
   RESEND_API_KEY?: string;
   NOTIFY_TO?: string;
   NOTIFY_FROM?: string;
+  FEEDBACK_ADMIN_KEY?: string;
 };
 
 declare module '*.mdx' {

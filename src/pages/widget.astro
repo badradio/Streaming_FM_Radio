@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Player from '../components/Player.astro';
+import Feedback from '../components/Feedback.astro';
 import PantherWalk from '../components/PantherWalk.astro';
 import { getPublicStreamUrl } from '../lib/runtime';
 import { reconcileDeskWithAir } from '../lib/radio/reconcile';
@@ -85,6 +86,8 @@ function artUrl(track: OnAirTrack | null): string | undefined {
           </div>
         </div>
       </section>
+
+      <Feedback compact />
 
       <PantherWalk compact />
 

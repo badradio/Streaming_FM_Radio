@@ -1,6 +1,9 @@
 import { defineMiddleware } from 'astro:middleware';
 import {
+  applyHeaders,
+  corsHeadersForRequest,
   corsPreflight,
+  isFeedbackWritePath,
   isManifestPath,
   isNowPlayingPath,
   isWidgetPath,
@@ -17,6 +20,9 @@ export const onRequest = defineMiddleware(async ({ request }, next) => {
   if (request.method === 'OPTIONS' && isNowPlayingPath(pathname)) {
     return corsPreflight(request);
   }
+  if (request.method === 'OPTIONS' && isFeedbackWritePath(pathname)) {
+    return corsPreflight(request, 'GET, POST, OPTIONS');
+  }
 
   const response = await next();
 
@@ -31,6 +37,10 @@ export const onRequest = defineMiddleware(async ({ request }, next) => {
   }
 
   if (isNowPlayingPath(pathname)) return withCors(request, response);
+  if (isFeedbackWritePath(pathname)) {
+    const cors = corsHeadersForRequest(request, 'GET, POST, OPTIONS');
+    return cors ? applyHeaders(response, cors) : response;
+  }
   if (isWidgetPath(pathname)) return withWidgetFraming(response);
   if (isManifestPath(pathname)) {
     const headers = new Headers(response.headers);

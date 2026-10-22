@@ -20,6 +20,7 @@ Licensed radio is coming via **Live365** (they bundle SoundExchange + the PROs).
 - Listen-page analytics hooks (Cloudflare Web Analytics preferred; GA4 optional). Pageviews + `play_click` + `signup_submit`. No emails in events.
 - Cloudflare **Workers** (Workers Assets + custom domain). Persistence: Workers KV (`STATION`) for desk state; D1 (`MASTER`) for the Dropbox master library and Outpost signups; `.data/station.json` in `astro dev`
 - Embeddable **`/widget`** player (iframe + optional `embed.js`) and a **PWA**. The listen page has a visible **listen anywhere** install/download section (not hidden until the browser prompt).
+- Preview-gated **listener feedback** (`?preview=feedback`, remembered in localStorage): thumbs on the current track plus an optional 200-character note. Hidden on the public page until that flag is on.
 
 Player, now-playing, request desk, and admin desk stay on the page. Signup never blocks play.
 
@@ -42,7 +43,7 @@ Player, now-playing, request desk, and admin desk stay on the page. Signup never
 5. Queue insert **and** AutoDJ pick refuse violations.
 6. Public site: now playing + recently played + “requests play later, not next.” The desk can see up-next and `earliest_play_at`.
 
-Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts), [`tests/sw.test.ts`](tests/sw.test.ts), [`tests/player-stream.test.ts`](tests/player-stream.test.ts), [`tests/plays.test.ts`](tests/plays.test.ts)).
+Unit tests: `npm test` ([`tests/srpc.test.ts`](tests/srpc.test.ts), [`tests/delay.test.ts`](tests/delay.test.ts), [`tests/autodj.test.ts`](tests/autodj.test.ts), [`tests/live365.test.ts`](tests/live365.test.ts), [`tests/operator.test.ts`](tests/operator.test.ts), [`tests/airlog.test.ts`](tests/airlog.test.ts), [`tests/master.test.ts`](tests/master.test.ts), [`tests/stream-redirect.test.ts`](tests/stream-redirect.test.ts), [`tests/outpost.test.ts`](tests/outpost.test.ts), [`tests/widget.test.ts`](tests/widget.test.ts), [`tests/sw.test.ts`](tests/sw.test.ts), [`tests/player-stream.test.ts`](tests/player-stream.test.ts), [`tests/plays.test.ts`](tests/plays.test.ts), [`tests/feedback.test.ts`](tests/feedback.test.ts)).
 
 ## Run locally
 
@@ -83,13 +84,14 @@ The player uses the native `<audio>` element (Icecast MP3/AAC). HLS is not wired
 | `RESEND_API_KEY` | Worker **secret** only | Optional. If set, first-time Outpost inserts email `NOTIFY_TO`. Signup still succeeds if mail fails or the secret is missing. Secret name must be exactly `RESEND_API_KEY`. |
 | `NOTIFY_TO` | Worker **plaintext** var | Recipient. Default `support@badradio.com`. |
 | `NOTIFY_FROM` | Worker **plaintext** var | Sender. Default `onboarding@resend.dev` (Resend sandbox — only delivers to the Resend account owner's email). After domain verify, set this to an address on the verified domain. |
+| `FEEDBACK_ADMIN_KEY` | Worker **secret** only | Required for `GET /api/feedback/summary`, `GET /api/feedback/messages`, and the tables on `/admin/feedback`. Header `x-feedback-key`, `Authorization: Bearer`, or `?key=`. Production: `wrangler secret put FEEDBACK_ADMIN_KEY`. Never commit it. |
 
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Astro dev server on port 43123 (file-backed desk state) |
-| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed + service worker + player reconnect + play-log tests |
+| `npm test` | SRPC + delay + AutoDJ + Live365 + operator + air-log + master-library + stream-redirect + outpost signup + widget/embed + service worker + player reconnect + play-log + listener-feedback tests |
 | `npm run d1:create` | `wrangler d1 create badradio-master` — already created; id is in wrangler.jsonc |
 | `npm run d1:migrate` | Apply SQL migrations to the **local** D1 |
 | `npm run d1:migrate:remote` | Apply SQL migrations to production D1 |
@@ -195,6 +197,18 @@ The same fetch **upserts an air log** in station KV: unique folded artist/title,
 A Worker **cron every minute** polls `https://api.live365.com/station/a58480` and `INSERT OR IGNORE`s `current-track` plus every `last-played` row into D1 table **`plays`** (migration [`0004_plays.sql`](migrations/0004_plays.sql)). Unique on `(artist, title, started_at)`. `started_at` is UTC ISO; `started_ct` is America/Chicago local. Live365 has no album — that column stays null. `is_cue` is 1 for j-number artists (`j12`), patreon, station IDs (`id` / `07-panther`), empty artist, artist `Live365`, and titles that contain `Ad Break`. Each poll also `UPDATE`s already-logged ad-break rows to `is_cue = 1`.
 
 Read-only: `GET /api/plays?since=&until=&artist=&limit=50&include_cues=false` → `{ ok, count, plays }` newest first. Default hides cues. Limit max 500. Does not change `/api/now-playing`.
+
+### Listener feedback (preview)
+
+Hidden until `?preview=feedback` is on the listen page or `/widget`. That choice is stored as `br_preview=feedback` in localStorage. `?preview=off` (or `0` / `none`) clears it. The public page keeps the markup `hidden`, so there is no extra gap.
+
+Votes and typed notes only — no voice, no conversation transcripts, no raw IP.
+
+- **Votes.** Thumbs up / down on the current track. The Worker takes artist / title / `started_at` from server-side now-playing (`reconcileDeskWithAir`), never from the client. One vote per anonymous `session_id` + artist + title + `started_at`; a new vote replaces the old one. Session id is a random 32-hex value in `localStorage` (`br_feedback_session`) — no login. Country and city come from `request.cf` only.
+- **Notes.** Optional form: kind `where_i_am` / `request` / `dedication`, body max 200 characters. Same session, geo, and time fields, plus the track that was on air. Honeypot field `website` (bots get a fake success). HTML, entities, and links are stripped or rejected. A small bad-word list returns a friendly error.
+- **Rate limits.** KV windows on `STATION`: 30 votes / hour and 5 messages / hour, keyed by session and by a SHA-256 prefix of the connecting IP. The hash is never written to D1.
+- **D1** tables `votes` and `messages` on `badradio-master` (binding `MASTER`). Migration [`0005_feedback.sql`](migrations/0005_feedback.sql). Runtime also `CREATE TABLE IF NOT EXISTS` the same way `plays` does.
+- **Mark’s results.** `GET /api/feedback/summary?artist=` → votes per airing (`up`, `down`, `net`, `lastVoted`) newest first. `GET /api/feedback/messages?kind=&limit=` → recent notes. Both require `FEEDBACK_ADMIN_KEY`. Small page: `/admin/feedback`.
 
 ## Dropbox master library (D1)
 
